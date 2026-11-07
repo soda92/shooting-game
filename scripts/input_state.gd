@@ -19,6 +19,7 @@ var touch_sprint := false
 
 var medkit_queued := false
 var scan_queued := false
+var first_person := false
 
 # mirrored from the player for UI display
 var medkit_count := 0
@@ -28,6 +29,7 @@ var _prev_space := false
 var _prev_reload := false
 var _prev_medkit := false
 var _prev_scan := false
+var _prev_view := false
 
 
 func _ready() -> void:
@@ -76,6 +78,11 @@ func _process(_delta: float) -> void:
 	if sc and not _prev_scan:
 		scan_queued = true
 	_prev_scan = sc
+
+	var vw := Input.is_key_pressed(KEY_V)
+	if vw and not _prev_view:
+		first_person = not first_person
+	_prev_view = vw
 
 	var use_mouse := not OS.has_feature("mobile")
 	sprint = touch_sprint or Input.is_key_pressed(KEY_SHIFT)

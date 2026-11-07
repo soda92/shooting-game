@@ -80,22 +80,26 @@ func _process(delta: float) -> void:
 		pitch = clampf(pitch - look.y * sens, -0.95, 0.55)
 		spring.rotation.x = pitch
 
+	var fp := InputState.first_person and state == State.PLAY
+	var ads := InputState.aim and state == State.PLAY
+
 	var target_fov := 72.0
-	if InputState.aim:
-		target_fov = 30.0 if weapon_id == "sniper" else 50.0
+	if ads:
+		if fp:
+			target_fov = 30.0 if weapon_id == "sniper" else 46.0
+		else:
+			target_fov = 38.0 if weapon_id == "sniper" else 50.0
 	_fov = lerpf(_fov, target_fov, 1.0 - exp(-9.0 * delta))
 	cam.fov = _fov
 
-	# Sniper ADS switches to a first-person view; other weapons just tighten
-	# the over-the-shoulder camera.
-	var scoped := InputState.aim and weapon_id == "sniper" and state == State.PLAY
-	var ads := InputState.aim and state == State.PLAY
+	# First-person (aiming or not) puts the camera at the head and hides the
+	# body. Third-person ADS pulls into a tight over-the-shoulder view.
 	var follow := 1.0 - exp(-16.0 * delta)
-	var arm_target := 0.45 if scoped else (3.0 if ads else 4.2)
-	var side_target := 0.0 if scoped else (0.80 if ads else 0.55)
+	var arm_target := 0.40 if fp else (3.0 if ads else 4.2)
+	var side_target := 0.0 if fp else (0.80 if ads else 0.55)
 	spring.spring_length = lerpf(spring.spring_length, arm_target, follow)
 	pivot.position.x = lerpf(pivot.position.x, side_target, follow)
-	visual.visible = not scoped
+	visual.visible = not fp
 
 	scan_t = maxf(0.0, scan_t - delta)
 	scan_cd = maxf(0.0, scan_cd - delta)

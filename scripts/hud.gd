@@ -77,7 +77,7 @@ class Scope extends Control:
 
 	func _process(delta: float) -> void:
 		var want := 0.0
-		if game != null and game.player != null and game.player.is_alive() and InputState.aim:
+		if game != null and game.player != null and game.player.is_alive() and InputState.aim and InputState.first_person:
 			want = 1.0
 		alpha = lerpf(alpha, want, 1.0 - exp(-16.0 * delta))
 		queue_redraw()
@@ -386,7 +386,7 @@ func show_end(win: bool, kills: int, place: int) -> void:
 
 func _process(delta: float) -> void:
 	if _reticle != null:
-		_reticle.visible = not InputState.aim
+		_reticle.visible = not (InputState.aim and InputState.first_person)
 
 	if _center_t > 0.0:
 		_center_t -= delta

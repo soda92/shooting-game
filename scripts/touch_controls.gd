@@ -46,6 +46,7 @@ func _layout() -> void:
 		"reload": {"pos": Vector2(s.x * 0.805, s.y * 0.880), "r": m * 0.056, "label": "换弹"},
 		"medkit": {"pos": Vector2(s.x * 0.720, s.y * 0.885), "r": m * 0.052, "label": "医疗"},
 		"scan": {"pos": Vector2(s.x * 0.640, s.y * 0.760), "r": m * 0.050, "label": "侦察"},
+		"view": {"pos": Vector2(s.x * 0.885, s.y * 0.500), "r": m * 0.052, "label": "视角"},
 	}
 	queue_redraw()
 
@@ -122,6 +123,9 @@ func _apply(name: String, on: bool) -> void:
 	elif name == "scan":
 		if on:
 			InputState.scan_queued = true
+	elif name == "view":
+		if on:
+			InputState.first_person = not InputState.first_person
 	queue_redraw()
 
 
@@ -179,6 +183,8 @@ func _draw() -> void:
 		var fill := Color(1.0, 0.55, 0.25, 0.38) if pressed else Color(1, 1, 1, 0.10)
 		if dim:
 			fill = Color(1, 1, 1, 0.05)
+		if name == "view" and InputState.first_person and not pressed:
+			fill = Color(0.35, 0.70, 1.0, 0.35)
 		draw_circle(p, r, fill)
 		draw_arc(p, r, 0.0, TAU, 44, Color(1, 1, 1, 0.30), 2.0)
 
