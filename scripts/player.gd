@@ -23,6 +23,9 @@ const MAX_MEDKITS := 3
 const MEDKIT_HEAL := 40.0
 const SCAN_TIME := 6.0
 const SCAN_CD := 18.0
+const MAX_ARMOR := 100.0
+const MAX_GRENADES := 3
+const GRENADE_SCENE := preload("res://scenes/grenade.tscn")
 
 var world
 var game
@@ -35,6 +38,8 @@ var active := 0
 var switching := 0.0
 var scopes_owned := {"red_dot": false, "4x": false, "8x": false}
 var medkits := 0
+var grenades := 0
+var armor := 0.0
 var scan_t := 0.0
 var scan_cd := 0.0
 
@@ -87,7 +92,7 @@ func can_be_targeted() -> bool:
 func _process(delta: float) -> void:
 	var look := InputState.consume_look()
 	if state == State.PLAY and not InputState.locked:
-		var sens := LOOK_SENS * (0.55 if InputState.aim else 1.0)
+		var sens := LOOK_SENS * InputState.sensitivity * (0.55 if InputState.aim else 1.0)
 		rotate_y(-look.x * sens)
 		pitch = clampf(pitch - look.y * sens, -0.95, 0.55)
 		spring.rotation.x = pitch
@@ -121,6 +126,7 @@ func _process(delta: float) -> void:
 	switching = maxf(0.0, switching - delta)
 	hit_from_t = maxf(0.0, hit_from_t - delta)
 	InputState.medkit_count = medkits
+	InputState.grenade_count = grenades
 	InputState.scan_cd = scan_cd
 
 	var planar := 0.0
@@ -138,6 +144,8 @@ func _process(delta: float) -> void:
 
 	if InputState.consume_medkit():
 		use_medkit()
+	if InputState.consume_grenade():
+		throw_grenade()
 	if InputState.consume_scan():
 		_activate_scan()
 
@@ -510,6 +518,34 @@ func add_medkit() -> bool:
 	return true
 
 
+func add_armor(v: float) -> bool:
+	if armor >= MAX_ARMOR:
+		return false
+	armor = minf(MAX_ARMOR, armor + v)
+	Sfx.play("pickup", -4.0)
+	return true
+
+
+func add_grenade() -> bool:
+	if grenades >= MAX_GRENADES:
+		return false
+	grenades += 1
+	Sfx.play("pickup", -4.0)
+	return true
+
+
+func throw_grenade() -> void:
+	if grenades <= 0 or state != State.PLAY:
+		return
+	grenades -= 1
+	var fwd := -cam.global_basis.z
+	var g = GRENADE_SCENE.instantiate()
+	get_tree().current_scene.add_child(g)
+	g.global_position = global_position + fwd * 0.9 + Vector3(0, 1.35, 0)
+	g.setup(world, self, fwd * 14.0 + Vector3(0, 5.0, 0))
+	Sfx.play("reload", -12.0, 0.7)
+
+
 func use_medkit() -> void:
 	if medkits <= 0 or health >= max_health or state != State.PLAY:
 		return
@@ -531,6 +567,10 @@ func _activate_scan() -> void:
 func take_damage(amount: float, attacker: Node = null) -> void:
 	if state == State.DEAD:
 		return
+	if armor > 0.0:
+		var absorbed := minf(armor, amount * 0.5)
+		armor -= absorbed
+		amount -= absorbed
 	if attacker != null and is_instance_valid(attacker):
 		hit_from_dir = (attacker.global_position - global_position).normalized()
 		hit_from_t = 1.0

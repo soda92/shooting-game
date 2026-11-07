@@ -149,6 +149,19 @@ write_wav("zone_warn", mix(0.38, [
     (0.19, sweep(880, 880, 0.12, 14, 0.8)),
 ]))
 
+# ---------------------------------------------------------------- explosion
+boom = []
+v = 0.0
+for i in range(int(SR * 0.9)):
+    t = i / SR
+    v += random.uniform(-1, 1) * 0.05
+    v *= 0.998
+    low = math.sin(2 * math.pi * 55 * t) * math.exp(-t * 4.0) * 1.2
+    rumble = v * 4.0 * math.exp(-t * 2.5)
+    crack = random.uniform(-1, 1) * math.exp(-t * 22) * 0.6
+    boom.append(low + rumble + crack)
+write_wav("explosion", boom, peak=1.0)
+
 # ---------------------------------------------------------------- movement
 for idx in range(3):
     k = [3.0, 5.0, 7.0][idx]

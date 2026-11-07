@@ -162,6 +162,8 @@ var game
 
 var _hp_bg: ColorRect
 var _hp_fill: ColorRect
+var _armor_bg: ColorRect
+var _armor_fill: ColorRect
 var _hp_label: Label
 var _med_label: Label
 var _ammo_label: Label
@@ -184,6 +186,14 @@ var _feed_dirty := false
 var _attach_root: Control
 var _attach_title: Label
 var _attach_buttons: Dictionary = {}
+var _settings_root: Control
+var _sens_slider: HSlider
+var _vol_slider: HSlider
+var _sens_value: Label
+var _vol_value: Label
+var _aim_toggle_btn: Button
+var _aim_hold_btn: Button
+var _gyro_check: CheckButton
 var _end_root: Control
 var _end_title: Label
 var _end_sub: Label
@@ -276,6 +286,8 @@ func _build() -> void:
 
 	_hp_bg = _bottom_rect(Color(0, 0, 0, 0.45), 28, -76, 330, -50)
 	_hp_fill = _bottom_rect(Color(0.30, 0.85, 0.42, 1), 31, -73, 327, -53)
+	_armor_bg = _bottom_rect(Color(0, 0, 0, 0.45), 28, -46, 330, -34)
+	_armor_fill = _bottom_rect(Color(0.30, 0.55, 1.0, 1), 31, -43, 327, -37)
 	_hp_label = _make_label("100 HP", 22)
 	_place(_hp_label, 0.0, 1.0, 0.0, 1.0, 30, -108, 330, -78)
 
@@ -307,6 +319,14 @@ func _build() -> void:
 	_place(skin_btn, 1.0, 0.0, 1.0, 0.0, -150, 64, -30, 104)
 	skin_btn.pressed.connect(_on_skin_pressed)
 	add_child(skin_btn)
+
+	var settings_btn := Button.new()
+	settings_btn.text = "设置"
+	settings_btn.focus_mode = Control.FOCUS_NONE
+	settings_btn.add_theme_font_size_override("font_size", 18)
+	_place(settings_btn, 1.0, 0.0, 1.0, 0.0, -310, 64, -170, 104)
+	settings_btn.pressed.connect(_toggle_settings)
+	add_child(settings_btn)
 
 	_zone_label = _make_label("安全区", 22)
 	_zone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -446,6 +466,140 @@ func _build() -> void:
 	close.pressed.connect(_close_attach)
 	vbox.add_child(close)
 
+	# Settings panel
+	_settings_root = Control.new()
+	_settings_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_settings_root.mouse_filter = Control.MOUSE_FILTER_STOP
+	_settings_root.visible = false
+	add_child(_settings_root)
+
+	var sdim := ColorRect.new()
+	sdim.color = Color(0, 0, 0, 0.62)
+	sdim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_settings_root.add_child(sdim)
+
+	var spanel := PanelContainer.new()
+	_place(spanel, 0.5, 0.5, 0.5, 0.5, -330, -250, 330, 250)
+	var ssb := StyleBoxFlat.new()
+	ssb.bg_color = Color(0.07, 0.09, 0.12, 0.97)
+	ssb.border_color = Color(0.35, 0.55, 0.75, 0.85)
+	ssb.set_border_width_all(2)
+	ssb.set_corner_radius_all(6)
+	spanel.add_theme_stylebox_override("panel", ssb)
+	_settings_root.add_child(spanel)
+
+	var smargin := MarginContainer.new()
+	smargin.add_theme_constant_override("margin_left", 24)
+	smargin.add_theme_constant_override("margin_right", 24)
+	smargin.add_theme_constant_override("margin_top", 18)
+	smargin.add_theme_constant_override("margin_bottom", 18)
+	spanel.add_child(smargin)
+
+	var svbox := VBoxContainer.new()
+	svbox.add_theme_constant_override("separation", 14)
+	smargin.add_child(svbox)
+
+	var stitle := Label.new()
+	stitle.text = "设置"
+	stitle.add_theme_font_size_override("font_size", 26)
+	svbox.add_child(stitle)
+
+	var row1 := HBoxContainer.new()
+	row1.add_theme_constant_override("separation", 12)
+	var l1 := Label.new()
+	l1.text = "灵敏度"
+	l1.custom_minimum_size = Vector2(110, 40)
+	l1.add_theme_font_size_override("font_size", 20)
+	_sens_slider = HSlider.new()
+	_sens_slider.min_value = 0.3
+	_sens_slider.max_value = 2.0
+	_sens_slider.step = 0.1
+	_sens_slider.custom_minimum_size = Vector2(320, 40)
+	_sens_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sens_value = Label.new()
+	_sens_value.custom_minimum_size = Vector2(64, 40)
+	_sens_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_sens_value.add_theme_font_size_override("font_size", 20)
+	row1.add_child(l1)
+	row1.add_child(_sens_slider)
+	row1.add_child(_sens_value)
+	svbox.add_child(row1)
+
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 12)
+	var l2 := Label.new()
+	l2.text = "音量"
+	l2.custom_minimum_size = Vector2(110, 40)
+	l2.add_theme_font_size_override("font_size", 20)
+	_vol_slider = HSlider.new()
+	_vol_slider.min_value = 0.0
+	_vol_slider.max_value = 1.0
+	_vol_slider.step = 0.05
+	_vol_slider.custom_minimum_size = Vector2(320, 40)
+	_vol_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_vol_value = Label.new()
+	_vol_value.custom_minimum_size = Vector2(64, 40)
+	_vol_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_vol_value.add_theme_font_size_override("font_size", 20)
+	row2.add_child(l2)
+	row2.add_child(_vol_slider)
+	row2.add_child(_vol_value)
+	svbox.add_child(row2)
+
+	var row3 := HBoxContainer.new()
+	row3.add_theme_constant_override("separation", 12)
+	var l3 := Label.new()
+	l3.text = "开镜模式"
+	l3.custom_minimum_size = Vector2(110, 40)
+	l3.add_theme_font_size_override("font_size", 20)
+	_aim_toggle_btn = Button.new()
+	_aim_toggle_btn.custom_minimum_size = Vector2(180, 44)
+	_aim_toggle_btn.focus_mode = Control.FOCUS_NONE
+	_aim_toggle_btn.add_theme_font_size_override("font_size", 18)
+	_aim_hold_btn = Button.new()
+	_aim_hold_btn.custom_minimum_size = Vector2(180, 44)
+	_aim_hold_btn.focus_mode = Control.FOCUS_NONE
+	_aim_hold_btn.add_theme_font_size_override("font_size", 18)
+	row3.add_child(l3)
+	row3.add_child(_aim_toggle_btn)
+	row3.add_child(_aim_hold_btn)
+	svbox.add_child(row3)
+
+	var row4 := HBoxContainer.new()
+	row4.add_theme_constant_override("separation", 12)
+	var l4 := Label.new()
+	l4.text = "陀螺仪"
+	l4.custom_minimum_size = Vector2(110, 40)
+	l4.add_theme_font_size_override("font_size", 20)
+	_gyro_check = CheckButton.new()
+	_gyro_check.text = "开启"
+	_gyro_check.focus_mode = Control.FOCUS_NONE
+	row4.add_child(l4)
+	row4.add_child(_gyro_check)
+	svbox.add_child(row4)
+
+	var sclose := Button.new()
+	sclose.text = "关闭"
+	sclose.custom_minimum_size = Vector2(560, 44)
+	sclose.add_theme_font_size_override("font_size", 20)
+	sclose.focus_mode = Control.FOCUS_NONE
+	sclose.pressed.connect(_close_settings)
+	svbox.add_child(sclose)
+
+	_sens_slider.value_changed.connect(_on_sens_changed)
+	_vol_slider.value_changed.connect(_on_vol_changed)
+	_aim_toggle_btn.pressed.connect(func() -> void:
+		InputState.set_aim_mode(true)
+		_refresh_settings()
+	)
+	_aim_hold_btn.pressed.connect(func() -> void:
+		InputState.set_aim_mode(false)
+		_refresh_settings()
+	)
+	_gyro_check.toggled.connect(func(on: bool) -> void:
+		InputState.set_gyro(on)
+	)
+
 
 # --------------------------------------------------------------------------
 # Public API
@@ -458,8 +612,10 @@ func update_hud() -> void:
 	var hpr: float = clampf(p.health / p.max_health, 0.0, 1.0)
 	_hp_fill.offset_right = 31.0 + 296.0 * hpr
 	_hp_fill.color = Color(0.90, 0.25, 0.20) if hpr < 0.35 else Color(0.30, 0.85, 0.42)
-	_hp_label.text = "%d HP" % int(ceil(p.health))
-	_med_label.text = "医疗包 x%d" % p.medkits
+	_hp_label.text = "%d HP   护甲 %d" % [int(ceil(p.health)), int(ceil(p.armor))]
+	_med_label.text = "医疗包 x%d   手雷 x%d" % [p.medkits, p.grenades]
+	var ar: float = clampf(p.armor / 100.0, 0.0, 1.0)
+	_armor_fill.offset_right = 31.0 + 296.0 * ar
 	_ammo_label.text = "%d / %d\n%s · %s" % [
 		p.mag(), p.reserve(),
 		String(Weapons.get_def(p.weapon_id())["label"]),
@@ -550,6 +706,9 @@ func _process(delta: float) -> void:
 	if _attach_root.visible:
 		if game == null or game.over or game.player == null or not game.player.is_alive():
 			_close_attach()
+	if _settings_root.visible:
+		if game == null or game.over or game.player == null or not game.player.is_alive():
+			_close_settings()
 
 	if _center_t > 0.0:
 		_center_t -= delta
@@ -595,6 +754,45 @@ func _on_restart() -> void:
 		game.restart()
 
 
+func _toggle_settings() -> void:
+	if _settings_root.visible:
+		_close_settings()
+		return
+	if game == null or game.player == null or game.over or not game.player.is_alive():
+		return
+	if _attach_root.visible:
+		_close_attach()
+	_refresh_settings()
+	_settings_root.visible = true
+	InputState.locked = true
+
+
+func _close_settings() -> void:
+	_settings_root.visible = false
+	if game != null and not game.over:
+		InputState.locked = false
+
+
+func _refresh_settings() -> void:
+	_sens_slider.set_value_no_signal(InputState.sensitivity)
+	_vol_slider.set_value_no_signal(InputState.master_volume)
+	_sens_value.text = "%.1f" % InputState.sensitivity
+	_vol_value.text = "%d%%" % int(round(InputState.master_volume * 100.0))
+	_aim_toggle_btn.text = ("● " if InputState.aim_toggle_mode else "○ ") + "点击开镜"
+	_aim_hold_btn.text = ("○ " if InputState.aim_toggle_mode else "● ") + "按住开镜"
+	_gyro_check.set_pressed_no_signal(InputState.gyro)
+
+
+func _on_sens_changed(v: float) -> void:
+	InputState.set_sensitivity(v)
+	_sens_value.text = "%.1f" % v
+
+
+func _on_vol_changed(v: float) -> void:
+	InputState.set_volume(v)
+	_vol_value.text = "%d%%" % int(round(v * 100.0))
+
+
 func _toggle_attach() -> void:
 	if game == null or game.player == null:
 		return
@@ -603,6 +801,8 @@ func _toggle_attach() -> void:
 		return
 	if game.over or not game.player.is_alive():
 		return
+	if _attach_root.visible:
+		_close_attach()
 	_refresh_attach()
 	_attach_root.visible = true
 	InputState.aim_toggle = false

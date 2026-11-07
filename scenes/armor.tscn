@@ -1,0 +1,63 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/armor_pickup.gd" id="1_armor"]
+
+[sub_resource type="BoxShape3D" id="pickup_shape"]
+size = Vector3(1.2, 1.2, 1.2)
+
+[sub_resource type="BoxMesh" id="vest_mesh"]
+size = Vector3(0.58, 0.52, 0.30)
+
+[sub_resource type="StandardMaterial3D" id="vest_mat"]
+albedo_color = Color(0.18, 0.28, 0.46, 1)
+roughness = 0.75
+metallic = 0.15
+
+[sub_resource type="BoxMesh" id="strap_mesh"]
+size = Vector3(0.09, 0.54, 0.32)
+
+[sub_resource type="SphereMesh" id="helmet_mesh"]
+radius = 0.22
+height = 0.34
+radial_segments = 12
+rings = 6
+is_hemisphere = true
+
+[sub_resource type="StandardMaterial3D" id="helmet_mat"]
+albedo_color = Color(0.22, 0.26, 0.20, 1)
+roughness = 0.8
+
+[node name="ArmorPickup" type="Area3D" groups=["armor"]]
+script = ExtResource("1_armor")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+shape = SubResource("pickup_shape")
+
+[node name="Vest" type="MeshInstance3D" parent="."]
+mesh = SubResource("vest_mesh")
+material_override = SubResource("vest_mat")
+
+[node name="StrapA" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, 0.02, 0)
+mesh = SubResource("strap_mesh")
+material_override = SubResource("helmet_mat")
+
+[node name="StrapB" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.02, 0)
+mesh = SubResource("strap_mesh")
+material_override = SubResource("helmet_mat")
+
+[node name="Helmet" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.34, 0)
+mesh = SubResource("helmet_mesh")
+material_override = SubResource("helmet_mat")
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.86, 0)
+billboard = 1
+no_depth_test = true
+font_size = 72
+pixel_size = 0.003
+outline_size = 12
+modulate = Color(0.55, 0.75, 1, 1)
+text = "ARMOR"

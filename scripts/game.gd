@@ -5,8 +5,12 @@ const BOT_COUNT := 11
 const LOOT_COUNT := 26
 const MEDKIT_COUNT := 10
 const SCOPE_COUNT := 6
+const ARMOR_COUNT := 5
+const GRENADE_COUNT := 5
 const MEDKIT_SCENE := preload("res://scenes/medkit.tscn")
 const SCOPE_SCENE := preload("res://scenes/scope.tscn")
+const ARMOR_SCENE := preload("res://scenes/armor.tscn")
+const GRENADE_PICKUP_SCENE := preload("res://scenes/grenade_pickup.tscn")
 const SCOPE_IDS := ["red_dot", "4x", "8x"]
 
 @onready var world = $World
@@ -38,6 +42,8 @@ func _ready() -> void:
 	_spawn_loot()
 	_spawn_medkits()
 	_spawn_scopes()
+	_spawn_armor()
+	_spawn_grenades()
 
 	hud.setup(self)
 	hud.set_center("从空中选择落点", 2.5)
@@ -145,6 +151,29 @@ func _spawn_scopes() -> void:
 
 func _on_scope_added(id: String) -> void:
 	hud.set_center("拾取 " + String(Scopes.get_def(id)["name"]), 1.0)
+
+
+func _pickup_point(spots: Array, i: int) -> Vector3:
+	if not spots.is_empty():
+		var s: Vector3 = spots[(i * 3) % spots.size()]
+		return Vector3(s.x + randf_range(-1.2, 1.2), 0.0, s.z + randf_range(-1.2, 1.2))
+	return world.random_land_point(165.0)
+
+
+func _spawn_armor() -> void:
+	for i in range(ARMOR_COUNT):
+		var p := _pickup_point(world.loot_spots, i)
+		var a = ARMOR_SCENE.instantiate()
+		a.position = Vector3(p.x, world.height_at(p.x, p.z) + 0.6, p.z)
+		add_child(a)
+
+
+func _spawn_grenades() -> void:
+	for i in range(GRENADE_COUNT):
+		var p := _pickup_point(world.loot_spots, i + 2)
+		var g = GRENADE_PICKUP_SCENE.instantiate()
+		g.position = Vector3(p.x, world.height_at(p.x, p.z) + 0.6, p.z)
+		add_child(g)
 
 
 func drop_weapon_at(id: String, pos: Vector3) -> void:

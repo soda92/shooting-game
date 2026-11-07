@@ -49,6 +49,7 @@ func _layout() -> void:
 		"medkit": {"pos": Vector2(s.x * 0.755, s.y * 0.895), "r": m * 0.045, "label": "医疗"},
 		"switch": {"pos": Vector2(s.x * 0.665, s.y * 0.895), "r": m * 0.044, "label": "切换"},
 		"scan": {"pos": Vector2(s.x * 0.575, s.y * 0.835), "r": m * 0.044, "label": "侦察"},
+		"grenade": {"pos": Vector2(s.x * 0.485, s.y * 0.895), "r": m * 0.044, "label": "手雷"},
 		"view": {"pos": Vector2(s.x * 0.930, s.y * 0.510), "r": m * 0.044, "label": "视角"},
 		"attach": {"pos": Vector2(s.x * 0.760, s.y * 0.470), "r": m * 0.044, "label": "配件"},
 	}
@@ -115,8 +116,11 @@ func _apply(name: String, on: bool) -> void:
 	if name == "fire" or name == "fire_l":
 		InputState.touch_fire = _any_fire_down()
 	elif name == "aim":
-		if on:
-			InputState.aim_toggle = not InputState.aim_toggle
+		if InputState.aim_toggle_mode:
+			if on:
+				InputState.aim_toggle = not InputState.aim_toggle
+		else:
+			InputState.touch_aim = on
 	elif name == "jump":
 		if on:
 			InputState.jump_queued = true
@@ -138,6 +142,9 @@ func _apply(name: String, on: bool) -> void:
 	elif name == "attach":
 		if on:
 			InputState.attach_toggle_queued = true
+	elif name == "grenade":
+		if on:
+			InputState.grenade_queued = true
 	queue_redraw()
 
 
@@ -192,6 +199,8 @@ func _draw() -> void:
 		var dim := false
 		var txt: String = b["label"]
 		if name == "medkit" and InputState.medkit_count <= 0:
+			dim = true
+		elif name == "grenade" and InputState.grenade_count <= 0:
 			dim = true
 		elif name == "scan" and InputState.scan_cd > 0.0:
 			dim = true

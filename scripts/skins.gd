@@ -83,6 +83,18 @@ static var LIST := [
 		"model": "res://assets/models/anime_pink.glb",
 		"model_yaw": PI,
 	},
+	{
+		"name": "二次元·青",
+		"style": "model",
+		"model": "res://assets/models/anime_cyan.glb",
+		"model_yaw": PI,
+	},
+	{
+		"name": "二次元·绯",
+		"style": "model",
+		"model": "res://assets/models/anime_crimson.glb",
+		"model_yaw": PI,
+	},
 ]
 
 
@@ -92,6 +104,8 @@ static var LIST := [
 ##   "res://assets/models/my_anime_skin.glb",
 const MODEL_MANIFEST := [
 	"res://assets/models/anime_pink.glb",
+	"res://assets/models/anime_cyan.glb",
+	"res://assets/models/anime_crimson.glb",
 ]
 
 

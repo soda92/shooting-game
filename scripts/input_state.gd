@@ -21,12 +21,21 @@ var aim_toggle := false
 var medkit_queued := false
 var scan_queued := false
 var switch_queued := false
+var grenade_queued := false
 var attach_toggle_queued := false
 var first_person := false
 
 # mirrored from the player for UI display
 var medkit_count := 0
+var grenade_count := 0
 var scan_cd := 0.0
+
+var sensitivity := 1.0
+var master_volume := 0.8
+var gyro := false
+var aim_toggle_mode := true
+
+const SETTINGS_PATH := "user://settings.cfg"
 
 var _prev_space := false
 var _prev_reload := false
@@ -34,13 +43,16 @@ var _prev_medkit := false
 var _prev_scan := false
 var _prev_view := false
 var _prev_switch := false
+var _prev_grenade := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_load_settings()
+	_apply_volume()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if locked:
 		move = Vector2.ZERO
 		touch_move = Vector2.ZERO
@@ -93,6 +105,16 @@ func _process(_delta: float) -> void:
 		switch_queued = true
 	_prev_switch = sw
 
+	var gr := Input.is_key_pressed(KEY_G)
+	if gr and not _prev_grenade:
+		grenade_queued = true
+	_prev_grenade = gr
+
+	if gyro and OS.has_feature("mobile"):
+		var g := Input.get_gyroscope()
+		look.x += g.y * 300.0 * sensitivity * delta
+		look.y += -g.x * 300.0 * sensitivity * delta
+
 	var use_mouse := not OS.has_feature("mobile")
 	sprint = touch_sprint or Input.is_key_pressed(KEY_SHIFT)
 	aim = aim_toggle or touch_aim or (use_mouse and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
@@ -134,6 +156,12 @@ func consume_scan() -> bool:
 	return v
 
 
+func consume_grenade() -> bool:
+	var v := grenade_queued
+	grenade_queued = false
+	return v
+
+
 func consume_switch() -> bool:
 	var v := switch_queued
 	switch_queued = false
@@ -144,6 +172,51 @@ func consume_attach() -> bool:
 	var v := attach_toggle_queued
 	attach_toggle_queued = false
 	return v
+
+
+func _load_settings() -> void:
+	var cf := ConfigFile.new()
+	if cf.load(SETTINGS_PATH) == OK:
+		sensitivity = float(cf.get_value("input", "sensitivity", sensitivity))
+		gyro = bool(cf.get_value("input", "gyro", gyro))
+		aim_toggle_mode = bool(cf.get_value("input", "aim_toggle", aim_toggle_mode))
+		master_volume = float(cf.get_value("audio", "master", master_volume))
+
+
+func save_settings() -> void:
+	var cf := ConfigFile.new()
+	cf.set_value("input", "sensitivity", sensitivity)
+	cf.set_value("input", "gyro", gyro)
+	cf.set_value("input", "aim_toggle", aim_toggle_mode)
+	cf.set_value("audio", "master", master_volume)
+	cf.save(SETTINGS_PATH)
+
+
+func _apply_volume() -> void:
+	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(master_volume, 0.001)))
+
+
+func set_volume(v: float) -> void:
+	master_volume = clampf(v, 0.0, 1.0)
+	_apply_volume()
+	save_settings()
+
+
+func set_sensitivity(v: float) -> void:
+	sensitivity = clampf(v, 0.3, 2.0)
+	save_settings()
+
+
+func set_gyro(v: bool) -> void:
+	gyro = v
+	save_settings()
+
+
+func set_aim_mode(toggle_mode: bool) -> void:
+	aim_toggle_mode = toggle_mode
+	aim_toggle = false
+	touch_aim = false
+	save_settings()
 
 
 func clear() -> void:
@@ -159,4 +232,5 @@ func clear() -> void:
 	medkit_queued = false
 	scan_queued = false
 	switch_queued = false
+	grenade_queued = false
 	attach_toggle_queued = false

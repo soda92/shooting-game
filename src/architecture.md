@@ -31,6 +31,9 @@ scripts/
   zone.gd              缩圈与圈外伤害
   loot.gd              武器箱拾取
   medkit.gd            医疗包拾取
+  armor_pickup.gd      护甲拾取
+  grenade.gd           手雷投掷与爆炸
+  grenade_pickup.gd    手雷拾取
   scope_pickup.gd      瞄具拾取
   minimap.gd           小地图
   game.gd              开局生成、存活统计、胜负判定

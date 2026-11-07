@@ -37,12 +37,15 @@
 
 ## 内置的二次元模型
 
-仓库里已经带了一个自己生成的二次元角色 `assets/models/anime_pink.glb`：
+仓库里已经带了三个自己生成的二次元角色：
 
-- 由 `tools/make_anime_skin.py` 在 Blender 5.2 里程序化生成
-- 大头、粉色双马尾、白衬衫、短裙、过膝袜、手枪
-- 带骨骼和 `Idle` / `Run` / `Aim` 三个动画
-- 游戏里显示为「二次元·樱」
+| 皮肤 | 文件 | 特征 |
+|---|---|---|
+| 二次元·樱 | `assets/models/anime_pink.glb` | 粉色双马尾、白衬衫、藏青短裙 |
+| 二次元·青 | `assets/models/anime_cyan.glb` | 青色双马尾、深色上衣、粉色鞋 |
+| 二次元·绯 | `assets/models/anime_crimson.glb` | 红色双马尾、白衬衫、暗红短裙 |
+
+它们都由 `tools/make_anime_skin.py` 在 Blender 5.2 里程序化生成，带骨骼和 `Idle` / `Run` / `Aim` 三个动画。
 
 重新生成或改样式：
 
@@ -50,7 +53,7 @@
 blender -b -P tools/make_anime_skin.py
 ```
 
-颜色、发型、服装尺寸都在脚本里，改完重新跑一次会覆盖 GLB。
+颜色、发型、服装尺寸都在脚本的 `VARIANTS` 和几何参数里，改完重新跑一次会覆盖三个 GLB。
 
 ## 二次元模型来源
 

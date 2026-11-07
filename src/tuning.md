@@ -9,6 +9,9 @@
 | 医疗包数量 | `scripts/game.gd` → `MEDKIT_COUNT` |
 | 瞄具数量 | `scripts/game.gd` → `SCOPE_COUNT` |
 | 玩家出生避开房区的距离 | `scripts/game.gd` → `random_open_point(140.0, 26.0)` |
+| 护甲 / 手雷数量 | `scripts/game.gd` → `ARMOR_COUNT` / `GRENADE_COUNT` |
+| 护甲减伤比例 | `scripts/player.gd` → `take_damage()` 里的 `0.5` |
+| 手雷引信 / 半径 / 伤害 | `scripts/grenade.gd` → `FUSE` / `RADIUS` / `_explode()` |
 | 降落伞样式 | `scripts/parachutes.gd` → `LIST`（按皮肤索引选择） |
 
 ## 武器与瞄具

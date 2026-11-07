@@ -8,7 +8,7 @@ extends Node
 const NAMES := [
 	"shot_rifle", "shot_smg", "shot_shotgun", "shot_sniper",
 	"hit", "kill", "hurt", "death", "reload", "empty",
-	"pickup", "heal", "scan", "zone_warn",
+	"pickup", "heal", "scan", "zone_warn", "explosion",
 	"footstep_1", "footstep_2", "footstep_3", "ambient_wind",
 ]
 

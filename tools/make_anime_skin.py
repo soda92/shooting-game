@@ -25,6 +25,39 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 FPS = 30
 
+VARIANTS = {
+    "pink": {
+        "hair": (1.00, 0.55, 0.72),
+        "blouse": (0.98, 0.98, 1.00),
+        "skirt": (0.10, 0.12, 0.26),
+        "socks": (0.07, 0.07, 0.09),
+        "shoe": (0.95, 0.95, 0.97),
+        "skin": (1.00, 0.82, 0.75),
+        "ribbon": (0.80, 0.14, 0.22),
+        "iris": (0.15, 0.45, 0.78),
+    },
+    "cyan": {
+        "hair": (0.24, 0.84, 0.92),
+        "blouse": (0.12, 0.14, 0.20),
+        "skirt": (0.07, 0.09, 0.16),
+        "socks": (0.15, 0.17, 0.22),
+        "shoe": (0.90, 0.20, 0.55),
+        "skin": (1.00, 0.84, 0.76),
+        "ribbon": (0.20, 0.90, 0.95),
+        "iris": (0.90, 0.30, 0.55),
+    },
+    "crimson": {
+        "hair": (0.86, 0.18, 0.24),
+        "blouse": (0.96, 0.93, 0.90),
+        "skirt": (0.20, 0.08, 0.10),
+        "socks": (0.09, 0.07, 0.08),
+        "shoe": (0.25, 0.20, 0.20),
+        "skin": (1.00, 0.82, 0.74),
+        "ribbon": (0.95, 0.75, 0.20),
+        "iris": (0.85, 0.35, 0.20),
+    },
+}
+
 
 # --------------------------------------------------------------------------
 # scene / materials
@@ -52,18 +85,18 @@ def make_mat(name, rgb, rough=0.85):
 MATS = {}
 
 
-def build_materials():
-    MATS["skin"] = make_mat("Skin", (1.00, 0.82, 0.75))
-    MATS["hair"] = make_mat("Hair", (1.00, 0.55, 0.72))
-    MATS["blouse"] = make_mat("Blouse", (0.98, 0.98, 1.00))
-    MATS["skirt"] = make_mat("Skirt", (0.10, 0.12, 0.26))
-    MATS["socks"] = make_mat("Socks", (0.07, 0.07, 0.09))
-    MATS["shoe"] = make_mat("Shoe", (0.95, 0.95, 0.97))
+def build_materials(pal):
+    MATS["skin"] = make_mat("Skin", pal["skin"])
+    MATS["hair"] = make_mat("Hair", pal["hair"])
+    MATS["blouse"] = make_mat("Blouse", pal["blouse"])
+    MATS["skirt"] = make_mat("Skirt", pal["skirt"])
+    MATS["socks"] = make_mat("Socks", pal["socks"])
+    MATS["shoe"] = make_mat("Shoe", pal["shoe"])
     MATS["eye"] = make_mat("EyeWhite", (0.98, 0.98, 1.00))
-    MATS["iris"] = make_mat("Iris", (0.15, 0.45, 0.78))
+    MATS["iris"] = make_mat("Iris", pal["iris"])
     MATS["pupil"] = make_mat("Pupil", (0.03, 0.04, 0.07))
     MATS["brow"] = make_mat("Brow", (0.55, 0.25, 0.35))
-    MATS["ribbon"] = make_mat("Ribbon", (0.80, 0.14, 0.22))
+    MATS["ribbon"] = make_mat("Ribbon", pal["ribbon"])
     MATS["gun"] = make_mat("Gun", (0.10, 0.11, 0.14))
 
 
@@ -447,8 +480,8 @@ def render_preview(path, cam_pos, target_pos, frame=1):
     bpy.ops.render.render(write_still=True)
 
 
-def export_glb():
-    out = os.path.join(OUT_DIR, "anime_pink.glb")
+def export_glb(key):
+    out = os.path.join(OUT_DIR, "anime_%s.glb" % key)
     bpy.ops.export_scene.gltf(
         filepath=out,
         export_format="GLB",
@@ -475,25 +508,40 @@ def set_action(arm, name):
 
 
 def main():
-    reset_scene()
-    build_materials()
-    build_character()
-    arm = build_armature()
-    join_and_bind(arm)
-    build_animations(arm)
-    setup_camera()
+    for key, pal in VARIANTS.items():
+        reset_scene()
+        PARTS.clear()
+        MATS.clear()
+        build_materials(pal)
+        build_character()
+        arm = build_armature()
+        join_and_bind(arm)
+        build_animations(arm)
+        setup_camera()
 
-    render_preview(os.path.join(PREVIEW_DIR, "anime_front.png"), (0, -3.6, 1.05), (0, 0, 0.95), 1)
-    render_preview(os.path.join(PREVIEW_DIR, "anime_side.png"), (2.7, -2.4, 1.25), (0, 0, 0.95), 1)
+        render_preview(
+            os.path.join(PREVIEW_DIR, "anime_%s_front.png" % key),
+            (0, -3.6, 1.05), (0, 0, 0.95), 1,
+        )
 
-    set_action(arm, "Run")
-    render_preview(os.path.join(PREVIEW_DIR, "anime_run.png"), (2.7, -2.4, 1.25), (0, 0, 0.95), 4)
+        if key == "pink":
+            render_preview(
+                os.path.join(PREVIEW_DIR, "anime_side.png"),
+                (2.7, -2.4, 1.25), (0, 0, 0.95), 1,
+            )
+            set_action(arm, "Run")
+            render_preview(
+                os.path.join(PREVIEW_DIR, "anime_run.png"),
+                (2.7, -2.4, 1.25), (0, 0, 0.95), 4,
+            )
+            set_action(arm, "Aim")
+            render_preview(
+                os.path.join(PREVIEW_DIR, "anime_aim.png"),
+                (2.4, -2.8, 1.20), (0, 0, 1.05), 1,
+            )
 
-    set_action(arm, "Aim")
-    render_preview(os.path.join(PREVIEW_DIR, "anime_aim.png"), (2.4, -2.8, 1.20), (0, 0, 1.05), 1)
-
-    set_action(arm, "Idle")
-    export_glb()
+        set_action(arm, "Idle")
+        export_glb(key)
 
 
 if __name__ == "__main__":

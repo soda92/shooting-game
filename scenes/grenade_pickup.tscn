@@ -1,0 +1,37 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/grenade_pickup.gd" id="1_pickup"]
+
+[sub_resource type="BoxShape3D" id="pickup_shape"]
+size = Vector3(1.0, 1.0, 1.0)
+
+[sub_resource type="SphereMesh" id="body_mesh"]
+radius = 0.20
+height = 0.40
+radial_segments = 12
+rings = 6
+
+[sub_resource type="StandardMaterial3D" id="body_mat"]
+albedo_color = Color(0.20, 0.30, 0.18, 1)
+roughness = 0.55
+metallic = 0.25
+
+[node name="GrenadePickup" type="Area3D" groups=["grenade"]]
+script = ExtResource("1_pickup")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+shape = SubResource("pickup_shape")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("body_mesh")
+material_override = SubResource("body_mat")
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+billboard = 1
+no_depth_test = true
+font_size = 72
+pixel_size = 0.003
+outline_size = 12
+modulate = Color(0.75, 0.95, 0.55, 1)
+text = "FRAG"
