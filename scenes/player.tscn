@@ -1,0 +1,35 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://scripts/character_visual.gd" id="2_visual"]
+
+[sub_resource type="CapsuleShape3D" id="body_shape"]
+radius = 0.35
+height = 1.8
+
+[node name="Player" type="CharacterBody3D" groups=["combatants", "player"]]
+script = ExtResource("1_player")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("body_shape")
+
+[node name="Visual" type="Node3D" parent="."]
+script = ExtResource("2_visual")
+
+[node name="Pivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 1.45, 0)
+
+[node name="SpringArm" type="SpringArm3D" parent="Pivot"]
+spring_length = 4.2
+margin = 0.2
+collision_mask = 1
+
+[node name="Camera" type="Camera3D" parent="Pivot/SpringArm"]
+current = true
+fov = 72.0
+near = 0.05
+far = 700.0
+
+[node name="Muzzle" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.33, 1.33, -0.9)
