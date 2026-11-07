@@ -45,7 +45,7 @@ scripts/
   grenade_pickup.gd    手雷拾取
   scope_pickup.gd      瞄具拾取
   minimap.gd           小地图（点击展开）
-  map_overlay.gd       全屏地图：地形贴图、圈、POI、物资、玩家
+  map_overlay.gd       右侧地图：地形贴图、圈、POI、物资、玩家、缩放/平移
   target.gd            训练场靶子
   game.gd              开局生成、存活统计、胜负判定、训练场、观战
   hud.gd               血条、弹药、槽位、播报、配件面板、镜圈

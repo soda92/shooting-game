@@ -64,7 +64,8 @@
 |---|---|
 | 摇杆 / 按钮位置和大小 | `scripts/touch_controls.gd` → `_layout()` |
 | 按钮淡出透明度和时间 | `scripts/touch_controls.gd` → `_process()` 的 `0.35` / `2.5` |
-| 小地图显示范围 | 自动取 `world.world_size * 0.5 + 20`；全屏地图在 `scripts/map_overlay.gd` |
+| 小地图显示范围 | 自动取 `world.world_size * 0.5 + 20`；地图面板在 `scripts/map_overlay.gd` |
+| 地图缩放范围 / 面板宽度 | `scripts/map_overlay.gd` → `_zoom_at()` 的 `1.0, 3.5` / `_update_layout()` |
 | 击杀播报停留时间 | `scripts/hud.gd` → `add_feed()` 里的 `4.0` |
 | 配件面板尺寸 | `scripts/hud.gd` → `_build()` 里 `_place(panel, ...)` |
 
