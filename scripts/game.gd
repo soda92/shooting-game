@@ -27,6 +27,17 @@ var kills := 0
 var over := false
 var place := 1
 
+var map_scale := 1.0
+var bot_count := BOT_COUNT
+var loot_count := LOOT_COUNT
+var medkit_count := MEDKIT_COUNT
+var scope_count := SCOPE_COUNT
+var armor_count := ARMOR_COUNT
+var grenade_count := GRENADE_COUNT
+var spawn_radius := 280.0
+var bot_radius := 330.0
+var zone_radius := 420.0
+
 var range_mode := false
 var target_hits := 0
 var spectating := false
@@ -41,6 +52,17 @@ func _ready() -> void:
 	InputState.locked = false
 	InputState.clear()
 
+	map_scale = world.map_scale
+	bot_count = int(round(BOT_COUNT * map_scale * 0.85))
+	loot_count = int(round(LOOT_COUNT * map_scale))
+	medkit_count = int(round(MEDKIT_COUNT * map_scale))
+	scope_count = int(round(SCOPE_COUNT * map_scale))
+	armor_count = int(round(ARMOR_COUNT * map_scale))
+	grenade_count = int(round(GRENADE_COUNT * map_scale))
+	spawn_radius = world.world_size * 0.31
+	bot_radius = world.world_size * 0.37
+	zone_radius = world.world_size * 0.466
+
 	range_mode = Meta.mode == "range"
 	if range_mode:
 		zone.training = range_mode
@@ -48,7 +70,7 @@ func _ready() -> void:
 		zone.get_node("Wall").visible = false
 		zone.visible = false
 	else:
-		zone.reset(420.0)
+		zone.reset(zone_radius, map_scale)
 	zone.phase_changed.connect(_on_zone_phase)
 
 	_spawn_player()
@@ -96,7 +118,7 @@ func _process(delta: float) -> void:
 func _spawn_player() -> void:
 	var scene: PackedScene = load("res://scenes/player.tscn")
 	player = scene.instantiate()
-	var p: Vector3 = world.random_open_point(280.0, 40.0)
+	var p: Vector3 = world.random_open_point(spawn_radius, 40.0 * map_scale)
 	player.position = Vector3(p.x, p.y + 120.0, p.z)
 	player.rotation.y = randf() * TAU
 	add_child(player)
@@ -117,11 +139,11 @@ func _spawn_player() -> void:
 
 func _spawn_bots() -> void:
 	var scene: PackedScene = load("res://scenes/bot.tscn")
-	for i in range(BOT_COUNT):
+	for i in range(bot_count):
 		var b = scene.instantiate()
-		var p: Vector3 = world.random_land_point(330.0)
-		if player != null and Vector2(p.x - player.position.x, p.z - player.position.z).length() < 45.0:
-			p = world.random_land_point(330.0)
+		var p: Vector3 = world.random_land_point(bot_radius)
+		if player != null and Vector2(p.x - player.position.x, p.z - player.position.z).length() < 45.0 * map_scale:
+			p = world.random_land_point(bot_radius)
 		b.position = Vector3(p.x, p.y + 2.0, p.z)
 		b.rotation.y = randf() * TAU
 		b.bot_name = "Bot %02d" % (i + 1)
@@ -135,14 +157,14 @@ func _spawn_bots() -> void:
 func _spawn_loot() -> void:
 	var scene: PackedScene = load("res://scenes/loot.tscn")
 	var spots: Array = world.loot_spots
-	for i in range(LOOT_COUNT):
+	for i in range(loot_count):
 		var l = scene.instantiate()
 		var p: Vector3
-		if i < 30 and not spots.is_empty():
+		if i < int(loot_count * 0.6) and not spots.is_empty():
 			var s: Vector3 = spots[i % spots.size()]
 			p = Vector3(s.x + randf_range(-1.2, 1.2), 0.0, s.z + randf_range(-1.2, 1.2))
 		else:
-			p = world.random_land_point(330.0)
+			p = world.random_land_point(bot_radius)
 		var gy: float = world.height_at(p.x, p.z)
 		l.position = Vector3(p.x, gy + 0.9, p.z)
 		add_child(l)
@@ -151,12 +173,12 @@ func _spawn_loot() -> void:
 
 func _spawn_medkits() -> void:
 	var spots: Array = world.loot_spots
-	for i in range(MEDKIT_COUNT):
-		if i < 8 and not spots.is_empty():
+	for i in range(medkit_count):
+		if i < int(medkit_count * 0.45) and not spots.is_empty():
 			var s: Vector3 = spots[(i * 2) % spots.size()]
 			spawn_medkit_at(Vector3(s.x + randf_range(-1.0, 1.0), 0.0, s.z + randf_range(-1.0, 1.0)))
 		else:
-			spawn_medkit_at(world.random_land_point(330.0))
+			spawn_medkit_at(world.random_land_point(bot_radius))
 
 
 func spawn_medkit_at(pos: Vector3) -> void:
@@ -168,13 +190,13 @@ func spawn_medkit_at(pos: Vector3) -> void:
 
 func _spawn_scopes() -> void:
 	var spots: Array = world.loot_spots
-	for i in range(SCOPE_COUNT):
+	for i in range(scope_count):
 		var p: Vector3
 		if not spots.is_empty():
 			var s: Vector3 = spots[(i * 3) % spots.size()]
 			p = Vector3(s.x + randf_range(-1.5, 1.5), 0.0, s.z + randf_range(-1.5, 1.5))
 		else:
-			p = world.random_land_point(330.0)
+			p = world.random_land_point(bot_radius)
 		var sc = SCOPE_SCENE.instantiate()
 		sc.position = Vector3(p.x, world.height_at(p.x, p.z) + 0.6, p.z)
 		add_child(sc)
@@ -189,11 +211,11 @@ func _pickup_point(spots: Array, i: int) -> Vector3:
 	if not spots.is_empty():
 		var s: Vector3 = spots[(i * 3) % spots.size()]
 		return Vector3(s.x + randf_range(-1.2, 1.2), 0.0, s.z + randf_range(-1.2, 1.2))
-	return world.random_land_point(330.0)
+	return world.random_land_point(bot_radius)
 
 
 func _spawn_armor() -> void:
-	for i in range(ARMOR_COUNT):
+	for i in range(armor_count):
 		var p := _pickup_point(world.loot_spots, i)
 		var a = ARMOR_SCENE.instantiate()
 		a.position = Vector3(p.x, world.height_at(p.x, p.z) + 0.6, p.z)
@@ -201,7 +223,7 @@ func _spawn_armor() -> void:
 
 
 func _spawn_grenades() -> void:
-	for i in range(GRENADE_COUNT):
+	for i in range(grenade_count):
 		var p := _pickup_point(world.loot_spots, i + 2)
 		var g = GRENADE_PICKUP_SCENE.instantiate()
 		g.position = Vector3(p.x, world.height_at(p.x, p.z) + 0.6, p.z)

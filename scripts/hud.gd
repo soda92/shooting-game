@@ -177,6 +177,10 @@ var _heal: ColorRect
 var _kill_label: Label
 var _reticle
 var _minimap
+var _map_layer: CanvasLayer
+var _map_overlay
+var _map_prev_locked := false
+var _map_prev_touch := true
 var _markers
 var _scope
 var _dmg_dir
@@ -220,10 +224,42 @@ func _ready() -> void:
 func setup(g: Node) -> void:
 	game = g
 	_minimap.setup(g)
+	_minimap.map_requested.connect(_open_map)
+	_map_overlay.setup(g)
 	_markers.game = g
 	_markers.font = theme.default_font
 	_scope.game = g
 	_dmg_dir.game = g
+
+
+func _open_map() -> void:
+	if _map_overlay == null or _map_overlay.visible:
+		return
+	_map_prev_locked = InputState.locked
+	InputState.locked = true
+	if game != null and game.touch != null:
+		_map_prev_touch = game.touch.visible
+		game.touch.reset_touches()
+		game.touch.visible = false
+	_map_overlay.open_map()
+
+
+func _close_map() -> void:
+	if _map_overlay == null:
+		return
+	_map_overlay.close_map()
+	InputState.locked = _map_prev_locked
+	if game != null and game.touch != null:
+		game.touch.visible = _map_prev_touch
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_M:
+		if _map_overlay != null and _map_overlay.visible:
+			_close_map()
+		else:
+			_open_map()
 
 
 # --------------------------------------------------------------------------
@@ -346,11 +382,27 @@ func _build() -> void:
 
 	_fps_label = _make_label("", 16)
 	_fps_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.45))
-	_place(_fps_label, 0.0, 0.0, 0.0, 0.0, 18, 234, 160, 258)
+	_place(_fps_label, 0.0, 0.0, 0.0, 0.0, 18, 282, 160, 306)
 
 	_minimap = preload("res://scripts/minimap.gd").new()
 	add_child(_minimap)
 	_place(_minimap, 0.0, 0.0, 0.0, 0.0, 18, 18, 228, 228)
+
+	var map_btn := Button.new()
+	map_btn.text = "地图"
+	map_btn.focus_mode = Control.FOCUS_NONE
+	map_btn.add_theme_font_size_override("font_size", 16)
+	_place(map_btn, 0.0, 0.0, 0.0, 0.0, 18, 234, 128, 274)
+	map_btn.pressed.connect(_open_map)
+	add_child(map_btn)
+
+	_map_layer = CanvasLayer.new()
+	_map_layer.layer = 20
+	add_child(_map_layer)
+	_map_overlay = preload("res://scripts/map_overlay.gd").new()
+	_map_layer.add_child(_map_overlay)
+	_map_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_map_overlay.closed.connect(_close_map)
 
 	_markers = Markers.new()
 	add_child(_markers)

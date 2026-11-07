@@ -1,22 +1,46 @@
 extends Control
 ## Top-down minimap: island texture, safe zone, loot, scanned enemies, player.
+## Tap it to open the full-screen map.
 
-const MAP_RANGE := 460.0
+signal map_requested
+
+var _range := 460.0
 
 var game
 
 var _tex: ImageTexture
 var _font: SystemFont
 var _built := false
+var _open_ms := 0
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	_font = SystemFont.new()
 	_font.font_names = PackedStringArray([
 		"Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "sans-serif"
 	])
+	gui_input.connect(_on_gui_input)
 	set_process(true)
+
+
+func _on_gui_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch and event.pressed:
+		_emit_map()
+		accept_event()
+	elif event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		_emit_map()
+		accept_event()
+
+
+func _emit_map() -> void:
+	# A touch also arrives as an emulated mouse click; debounce both.
+	var now := Time.get_ticks_msec()
+	if now - _open_ms < 300:
+		return
+	_open_ms = now
+	map_requested.emit()
 
 
 func _process(_delta: float) -> void:
@@ -25,18 +49,20 @@ func _process(_delta: float) -> void:
 
 func setup(g: Node) -> void:
 	game = g
+	if game != null and game.world != null:
+		_range = game.world.world_size * 0.5 + 20.0
 	_build_texture()
 
 
 func _build_texture() -> void:
 	if game == null or game.world == null:
 		return
-	var n := 192
+	var n := clampi(int(_range / 2.7), 192, 320)
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	for py in range(n):
-		var wz := -MAP_RANGE + (py + 0.5) / float(n) * MAP_RANGE * 2.0
+		var wz := -_range + (py + 0.5) / float(n) * _range * 2.0
 		for px in range(n):
-			var wx := -MAP_RANGE + (px + 0.5) / float(n) * MAP_RANGE * 2.0
+			var wx := -_range + (px + 0.5) / float(n) * _range * 2.0
 			var h: float = game.world.height_at(wx, wz)
 			var c: Color
 			if h < 0.0:
@@ -56,8 +82,8 @@ func _build_texture() -> void:
 
 func _to_map(p: Vector3) -> Vector2:
 	return Vector2(
-		(p.x + MAP_RANGE) / (MAP_RANGE * 2.0) * size.x,
-		(p.z + MAP_RANGE) / (MAP_RANGE * 2.0) * size.y
+		(p.x + _range) / (_range * 2.0) * size.x,
+		(p.z + _range) / (_range * 2.0) * size.y
 	)
 
 
@@ -76,7 +102,7 @@ func _draw() -> void:
 
 	# safe zone
 	var zc := _to_map(game.zone.center)
-	var scale := size.x / (MAP_RANGE * 2.0)
+	var scale := size.x / (_range * 2.0)
 	draw_arc(zc, game.zone.radius * scale, 0.0, TAU, 72, Color(0.45, 0.90, 1.0, 0.95), 2.0)
 	var tr: float = game.zone.target_radius()
 	if tr > 0.0 and tr < game.zone.radius:
@@ -131,3 +157,8 @@ func _draw() -> void:
 		pp - dir * 5.0 + side * 5.0,
 		pp - dir * 5.0 - side * 5.0,
 	]), Color(1, 1, 1, 1.0))
+
+	draw_string(
+		_font, Vector2(size.x - 42.0, size.y - 8.0), "展开",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1.0, 1.0, 1.0, 0.62)
+	)

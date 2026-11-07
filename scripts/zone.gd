@@ -13,6 +13,7 @@ const PHASES := [
 
 var center := Vector3.ZERO
 var radius := 420.0
+var map_scale := 1.0
 var dps := 2.0
 var shrinking := false
 var training := false
@@ -29,8 +30,9 @@ var _to_center := Vector3.ZERO
 @onready var wall: MeshInstance3D = $Wall
 
 
-func reset(start_radius: float) -> void:
+func reset(start_radius: float, scale := 1.0) -> void:
 	center = Vector3(0.0, 0.0, 0.0)
+	map_scale = scale
 	radius = start_radius
 	_phase = 0
 	shrinking = false
@@ -46,7 +48,7 @@ func _prepare_next() -> void:
 	if _phase >= PHASES.size():
 		return
 	var ph: Dictionary = PHASES[_phase]
-	_to_r = float(ph["to"])
+	_to_r = float(ph["to"]) * map_scale
 	var max_off := maxf(0.0, radius - _to_r)
 	var ang := randf() * TAU
 	var off := randf() * max_off * 0.9

@@ -290,7 +290,7 @@ func _shoot() -> void:
 		return
 
 	slots[active]["mag"] = mag() - 1
-	Sfx.play("shot_" + id, -2.0, randf_range(0.95, 1.06))
+	Sfx.play("shot_" + id, 0.0, randf_range(0.95, 1.06))
 	_fire_cd = Weapons.shot_interval(id)
 	_muzzle_flash()
 

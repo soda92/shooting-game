@@ -28,9 +28,11 @@ const POOL_ECHO := 8
 
 var _streams: Dictionary = {}
 var _pool2d: Array[AudioStreamPlayer] = []
+var _pool_weapon: Array[AudioStreamPlayer] = []
 var _pool3d: Array[AudioStreamPlayer3D] = []
 var _pool_echo: Array[AudioStreamPlayer3D] = []
 var _i2d := 0
+var _iw := 0
 var _i3d := 0
 var _iecho := 0
 var _ambient: AudioStreamPlayer
@@ -55,6 +57,13 @@ func _ready() -> void:
 		p.bus = "SFX"
 		add_child(p)
 		_pool2d.append(p)
+
+	for i in range(6):
+		var wp := AudioStreamPlayer.new()
+		wp.process_mode = Node.PROCESS_MODE_ALWAYS
+		wp.bus = "Weapon"
+		add_child(wp)
+		_pool_weapon.append(wp)
 
 	for i in range(POOL_3D):
 		_pool3d.append(_make_3d("World", 150.0))
@@ -90,6 +99,25 @@ func _setup_buses() -> void:
 		eq.set_band_gain_db(0, -9.0)
 		eq.set_band_gain_db(5, 1.0)
 		AudioServer.add_bus_effect(i, eq)
+
+	var weapon := AudioServer.get_bus_index("Weapon")
+	if weapon == -1:
+		AudioServer.add_bus()
+		weapon = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(weapon, "Weapon")
+		AudioServer.set_bus_send(weapon, "Master")
+	if AudioServer.get_bus_effect_count(weapon) == 0:
+		var weq := AudioEffectEQ6.new()
+		weq.set_band_gain_db(1, 1.5)
+		weq.set_band_gain_db(4, 1.5)
+		AudioServer.add_bus_effect(weapon, weq)
+		var wreverb := AudioEffectReverb.new()
+		wreverb.room_size = 0.35
+		wreverb.damping = 0.6
+		wreverb.predelay_msec = 12.0
+		wreverb.wet = 0.10
+		wreverb.dry = 1.0
+		AudioServer.add_bus_effect(weapon, wreverb)
 
 	var world := AudioServer.get_bus_index("World")
 	if world == -1:
@@ -191,8 +219,13 @@ func play(name: String, volume_db := 0.0, pitch := 1.0) -> void:
 	var key := _pick_stream(name)
 	if not _streams.has(key):
 		return
-	var p := _pool2d[_i2d]
-	_i2d = (_i2d + 1) % _pool2d.size()
+	var p: AudioStreamPlayer
+	if name.begins_with("shot_") and not _pool_weapon.is_empty():
+		p = _pool_weapon[_iw]
+		_iw = (_iw + 1) % _pool_weapon.size()
+	else:
+		p = _pool2d[_i2d]
+		_i2d = (_i2d + 1) % _pool2d.size()
 	p.stream = _streams[key]
 	p.volume_db = volume_db + randf_range(-0.8, 0.8)
 	p.pitch_scale = pitch * randf_range(0.97, 1.03)

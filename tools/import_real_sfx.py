@@ -33,7 +33,7 @@ import tempfile
 import wave
 
 import numpy as np
-from scipy.signal import resample_poly
+from scipy.signal import butter, lfilter, resample_poly, sosfilt
 
 SR = 44100
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -99,6 +99,51 @@ def fade(x, fin_ms=3.0, fout_ms=50.0):
     return x
 
 
+def highpass(x, freq, order=2):
+    sos = butter(order, freq / (SR * 0.5), btype="highpass", output="sos")
+    return sosfilt(sos, x).astype(np.float32)
+
+
+def peaking(x, freq, gain_db, q):
+    a = 10.0 ** (gain_db / 40.0)
+    w0 = 2.0 * math.pi * freq / SR
+    alpha = math.sin(w0) / (2.0 * q)
+    b = np.array([1.0 + alpha * a, -2.0 * math.cos(w0), 1.0 - alpha * a])
+    ca = np.array([1.0 + alpha / a, -2.0 * math.cos(w0), 1.0 - alpha / a])
+    return lfilter(b, ca, x).astype(np.float32)
+
+
+def shape_gun(x, variant):
+    """Make a field recording punchy and game-ready.
+
+    The source is a distant field recording (dark, ~2 kHz centroid). Add
+    presence, remove boxiness, and reinforce the transient with a short
+    high-frequency crack and a sub thump. This keeps the real texture while
+    restoring the snap the old synth had.
+    """
+    x = x.copy()
+    x = highpass(x, 55.0, 2)
+    x = peaking(x, 350.0, -4.5, 1.0)
+    x = peaking(x, 3200.0, 5.5, 0.9)
+    x = peaking(x, 9000.0, 3.0, 0.7)
+
+    rng = np.random.default_rng(700 + variant)
+    n = int(0.006 * SR)
+    t = np.arange(n, dtype=np.float32) / SR
+    crack = rng.normal(0.0, 1.0, n).astype(np.float32) * np.exp(-t * 520.0)
+    x[:n] += highpass(crack, 2400.0) * 0.34
+
+    m = int(0.10 * SR)
+    t = np.arange(m, dtype=np.float32) / SR
+    f = 92.0 * (1.0 + 0.9 * np.exp(-t * 25.0))
+    sub = np.sin(np.cumsum(2.0 * math.pi * f / SR)) * np.exp(-t * 22.0) * 0.30
+    x[:m] += sub
+
+    x = np.tanh(x * 1.12) / np.tanh(1.12)
+    x = fade(x, 1.0, 70.0)
+    return normalize(x, 0.95)
+
+
 def write_wav(name, x):
     data = np.clip(x, -1.0, 1.0)
     pcm = (data * 32767.0).astype(np.int16).tobytes()
@@ -111,7 +156,7 @@ def write_wav(name, x):
     print("%-24s %.2fs" % (name, len(x) / SR))
 
 
-def extract(path, onset, duration, pitch_factor=1.0, peak=0.9):
+def extract(path, onset, duration, pitch_factor=1.0, variant=0):
     x, sr = read_wav(path)
     x = resample(x, sr)
     start = max(0, int((onset - 0.02) * SR))
@@ -122,8 +167,7 @@ def extract(path, onset, duration, pitch_factor=1.0, peak=0.9):
     seg = trim_onset(seg, 0.08)
     seg = pitch(seg, pitch_factor)
     seg = seg - float(np.mean(seg))
-    seg = normalize(seg, peak)
-    return fade(seg)
+    return shape_gun(seg, variant)
 
 
 # ---------------------------------------------------------------- gunshots
@@ -143,7 +187,7 @@ def import_guns(src):
         variants = []
         for i, p in enumerate(pitches):
             onset = onsets[i % len(onsets)]
-            variants.append(extract(path, onset, dur, p, 0.9))
+            variants.append(extract(path, onset, dur, p, i))
         for i, data in enumerate(variants, 1):
             write_wav("shot_%s_%d" % (weapon, i), data)
         write_wav("shot_%s" % weapon, variants[0])

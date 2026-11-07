@@ -10,7 +10,7 @@
 | 武器箱数量 | `scripts/game.gd` → `LOOT_COUNT` |
 | 医疗包数量 | `scripts/game.gd` → `MEDKIT_COUNT` |
 | 瞄具数量 | `scripts/game.gd` → `SCOPE_COUNT` |
-| 玩家出生避开房区的距离 | `scripts/game.gd` → `random_open_point(280.0, 40.0)` |
+| 玩家出生半径 | `scripts/game.gd` → `spawn_radius = world.world_size * 0.31` |
 | 护甲 / 手雷数量 | `scripts/game.gd` → `ARMOR_COUNT` / `GRENADE_COUNT` |
 | 护甲减伤比例 | `scripts/player.gd` → `take_damage()` 里的 `0.5` |
 | 手雷引信 / 半径 / 伤害 | `scripts/grenade.gd` → `FUSE` / `RADIUS` / `_explode()` |
@@ -50,11 +50,12 @@
 |---|---|
 | 缩圈节奏 / 半径 / 伤害 | `scripts/zone.gd` → `PHASES` |
 | 圈心随机偏移幅度 | `scripts/zone.gd` → `_prepare_next()` 里的 `0.9` |
-| 岛的大小 / 地形精度 | `scripts/world.gd` → `WORLD_SIZE` / `RES` |
+| 地图大小 | `scripts/world.gd` → `MAP_SIZE_MULT`（900m × 倍率） |
+| 地形区块 / 精度 / 视距 | `scripts/world.gd` → `CHUNK_SIZE` / `CHUNK_RES` / `VIEW_CHUNKS` |
 | 房区数量 | `scripts/world.gd` → `POI_COUNT` |
-| 房区平整度 / 间距 | `scripts/world.gd` → `_is_flat(p, 9.0, 2.2)` / `140.0` |
-| 城区位置 / 台地高度 | `scripts/world.gd` → `CITY_CENTER` / `CITY_PLATEAU` |
-| 湖泊位置 / 半径 / 深度 | `scripts/world.gd` → `POND_CENTER` / `POND_RADIUS` / `POND_DEPTH` |
+| 房区平整度 / 间距 | `scripts/world.gd` → `_is_flat(p, 9.0, 2.2)` / `140.0 * map_scale` |
+| 城区比例位置 | `scripts/world.gd` → `CITY_FX` / `CITY_FZ`（台地高度自动取当地高度） |
+| 湖泊比例位置 / 半径 / 深度 | `scripts/world.gd` → `POND_FX` / `POND_FZ` / `POND_RADIUS`（深度自动） |
 | 草地密度 / 视距 / 叶高 / 最大高度 | `scripts/grass.gd` → `PER_CHUNK` / `VIEW` / `_make_blade_mesh()` / `15.0` |
 
 ## UI 与触屏
@@ -63,7 +64,7 @@
 |---|---|
 | 摇杆 / 按钮位置和大小 | `scripts/touch_controls.gd` → `_layout()` |
 | 按钮淡出透明度和时间 | `scripts/touch_controls.gd` → `_process()` 的 `0.35` / `2.5` |
-| 小地图显示范围 | `scripts/minimap.gd` → `MAP_RANGE` |
+| 小地图显示范围 | 自动取 `world.world_size * 0.5 + 20`；全屏地图在 `scripts/map_overlay.gd` |
 | 击杀播报停留时间 | `scripts/hud.gd` → `add_feed()` 里的 `4.0` |
 | 配件面板尺寸 | `scripts/hud.gd` → `_build()` 里 `_place(panel, ...)` |
 
@@ -75,6 +76,8 @@
 | 3D 衰减 / 距离低通 | `scripts/sfx.gd` → `max_distance` / `unit_size` / `attenuation_filter_*` |
 | 环境音音量 | `scripts/sfx.gd` → `_start_ambience()` 的 `-25.0` / `-31.0` |
 | 音效列表 | `scripts/sfx.gd` → `NAMES` |
+| 真实枪声 EQ / 瞬态 | `tools/import_real_sfx.py` → `shape_gun()` |
+| 玩家枪声音量 / 总线 | `scripts/player.gd` 的 `Sfx.play(..., 0.0)`；`scripts/sfx.gd` 的 `Weapon` 总线 |
 | 枪声变体数量 | `scripts/sfx.gd` → `_pick_stream()` 的 `1..3` |
 | 遮挡 / 回声触发距离 | `scripts/sfx.gd` → `_play_3d()` 里的 `38.0` / `2.5` |
 | 鸟叫间隔 | `scripts/sfx.gd` → `_process()` 里的 `7.0, 19.0` |

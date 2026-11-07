@@ -1,22 +1,36 @@
 extends Node3D
 ## Procedural island: heightmap terrain, water, trees and rocks.
 
-const WORLD_SIZE := 900.0
-const RES := 200
+const BASE_WORLD_SIZE := 900.0
+const MAP_SIZE_MULT := 1.55   # 1395m map; change this to expand further
+const CHUNK_SIZE := 180.0
+const CHUNK_RES := 30         # 6m grid, 49 chunks in view
+const VIEW_CHUNKS := 3        # 7x7 chunks around the player
 const WATER_LEVEL := 0.0
 
 const POI_COUNT := 5
 const CITY_INDEX := 3
-const CITY_CENTER := Vector2(58.0, 52.0)
-const CITY_PLATEAU := 9.0
+const CITY_FX := 0.064
+const CITY_FZ := 0.058
 const CITY_FLAT := 46.0
 const CITY_BLEND := 72.0
-const POND_CENTER := Vector2(45.0, -150.0)
+const POND_FX := 0.05
+const POND_FZ := -0.167
 const POND_RADIUS := 46.0
-const POND_DEPTH := 9.0
+
+var world_size := BASE_WORLD_SIZE * MAP_SIZE_MULT
+var map_scale := MAP_SIZE_MULT
+var city_center := Vector2(world_size * CITY_FX, world_size * CITY_FZ)
+var pond_center := Vector2(world_size * POND_FX, world_size * POND_FZ)
+var city_plateau := 9.0
+var pond_depth := 9.0
 
 var _noise := FastNoiseLite.new()
 var _tint := FastNoiseLite.new()
+var _terrain_mat: StandardMaterial3D
+var _terrain_root: Node3D
+var _chunks: Dictionary = {}
+var _focus := Vector2i(999999, 999999)
 
 var poi_centers: Array[Vector3] = []
 var loot_spots: Array[Vector3] = []
@@ -33,12 +47,22 @@ func _ready() -> void:
 	_tint.seed = 4242
 	_tint.frequency = 0.05
 
-	_build_terrain()
+	# Landmarks follow the map scale. The plateau/depth are derived from the
+	# natural height so the city stays flat and the lake still reaches water.
+	city_plateau = base_height_at(city_center.x, city_center.y)
+	pond_depth = maxf(9.0, base_height_at(pond_center.x, pond_center.y) + 8.0)
+
+	_terrain_mat = _make_terrain_mat()
+	_terrain_root = Node3D.new()
+	_terrain_root.name = "TerrainChunks"
+	add_child(_terrain_root)
+
 	_build_water()
 	_build_pois()
 	_build_bridge()
 	_scatter_trees()
 	_scatter_rocks()
+	set_process(true)
 
 
 # --------------------------------------------------------------------------
@@ -46,7 +70,7 @@ func _ready() -> void:
 # --------------------------------------------------------------------------
 
 func base_height_at(x: float, z: float) -> float:
-	var d := Vector2(x, z).length() / (WORLD_SIZE * 0.5)
+	var d := Vector2(x, z).length() / (world_size * 0.5)
 	var land := clampf(1.0 - pow(d, 3.0), 0.0, 1.0)
 	var n := _noise.get_noise_2d(x, z) * 0.5 + 0.5
 	return n * n * 55.0 * land - 5.0 - 12.0 * (1.0 - land)
@@ -55,14 +79,14 @@ func base_height_at(x: float, z: float) -> float:
 func height_at(x: float, z: float) -> float:
 	var h := base_height_at(x, z)
 	# Flatten a plateau for the city so streets and plaza sit flush.
-	var cd := Vector2(x - CITY_CENTER.x, z - CITY_CENTER.y).length()
+	var cd := Vector2(x - city_center.x, z - city_center.y).length()
 	if cd < CITY_BLEND:
 		var t := 1.0 - smoothstep(CITY_FLAT, CITY_BLEND, cd)
-		h = lerpf(h, CITY_PLATEAU, t)
+		h = lerpf(h, city_plateau, t)
 	# Inland lake: a shallow bowl that reaches below the water plane.
-	var pd := Vector2(x - POND_CENTER.x, z - POND_CENTER.y).length()
+	var pd := Vector2(x - pond_center.x, z - pond_center.y).length()
 	var pond := clampf(1.0 - pd / POND_RADIUS, 0.0, 1.0)
-	h -= POND_DEPTH * pond * pond
+	h -= pond_depth * pond * pond
 	return h
 
 
@@ -122,27 +146,66 @@ func _normal_at(x: float, z: float) -> Vector3:
 	return Vector3(-dx, 2.0 * e, -dz).normalized()
 
 
-func _build_terrain() -> void:
+func _make_terrain_mat() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
+	mat.roughness = 0.95
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return mat
+
+
+func _process(_delta: float) -> void:
+	var p := get_tree().get_first_node_in_group("player")
+	if p == null:
+		return
+	var c := Vector2i(
+		floori(p.global_position.x / CHUNK_SIZE),
+		floori(p.global_position.z / CHUNK_SIZE)
+	)
+	if c == _focus:
+		return
+	_focus = c
+	_refresh_chunks(c)
+
+
+func _refresh_chunks(center: Vector2i) -> void:
+	var keep := {}
+	for dx in range(-VIEW_CHUNKS, VIEW_CHUNKS + 1):
+		for dz in range(-VIEW_CHUNKS, VIEW_CHUNKS + 1):
+			var key := Vector2i(center.x + dx, center.y + dz)
+			keep[key] = true
+			if not _chunks.has(key):
+				_make_chunk(key)
+	for key in _chunks.keys():
+		if not keep.has(key):
+			_chunks[key].queue_free()
+			_chunks.erase(key)
+
+
+func _make_chunk(key: Vector2i) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 
-	var step := WORLD_SIZE / float(RES)
-	var half := WORLD_SIZE * 0.5
+	var ox := float(key.x) * CHUNK_SIZE
+	var oz := float(key.y) * CHUNK_SIZE
+	var step := CHUNK_SIZE / float(CHUNK_RES)
+	var row := CHUNK_RES + 1
 
-	for iz in range(RES + 1):
-		for ix in range(RES + 1):
-			var x := -half + ix * step
-			var z := -half + iz * step
+	for iz in range(row):
+		for ix in range(row):
+			var x := ox + ix * step
+			var z := oz + iz * step
 			var y := height_at(x, z)
 			st.set_color(_color_for(x, z, y))
 			st.set_normal(_normal_at(x, z))
 			st.add_vertex(Vector3(x, y, z))
 
-	for iz in range(RES):
-		for ix in range(RES):
-			var i0 := iz * (RES + 1) + ix
+	for iz in range(CHUNK_RES):
+		for ix in range(CHUNK_RES):
+			var i0 := iz * row + ix
 			var i1 := i0 + 1
-			var i2 := i0 + (RES + 1)
+			var i2 := i0 + row
 			var i3 := i2 + 1
 			st.add_index(i0)
 			st.add_index(i1)
@@ -153,27 +216,25 @@ func _build_terrain() -> void:
 
 	var mesh := st.commit()
 
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.vertex_color_is_srgb = true
-	mat.roughness = 0.95
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var root := Node3D.new()
+	root.name = "Chunk_%d_%d" % [key.x, key.y]
 
 	var mi := MeshInstance3D.new()
-	mi.name = "Terrain"
 	mi.mesh = mesh
-	mi.material_override = mat
+	mi.material_override = _terrain_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	add_child(mi)
+	root.add_child(mi)
 
 	var body := StaticBody3D.new()
-	body.name = "TerrainBody"
 	var col := CollisionShape3D.new()
 	var shape := mesh.create_trimesh_shape()
 	shape.backface_collision = true
 	col.shape = shape
 	body.add_child(col)
-	add_child(body)
+	root.add_child(body)
+
+	_terrain_root.add_child(root)
+	_chunks[key] = root
 
 
 # --------------------------------------------------------------------------
@@ -182,7 +243,7 @@ func _build_terrain() -> void:
 
 func _build_water() -> void:
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(3000.0, 3000.0)
+	plane.size = Vector2(maxf(4000.0, world_size * 3.0), maxf(4000.0, world_size * 3.0))
 
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.08, 0.30, 0.42, 0.82)
@@ -218,15 +279,15 @@ func _scatter_trees() -> void:
 	cone.material = mat
 
 	var transforms: Array[Transform3D] = []
-	for i in range(900):
-		var p := random_land_point(330.0)
+	for i in range(int(round(900.0 * map_scale * map_scale))):
+		var p := random_land_point(330.0 * map_scale)
 		if p.y < 2.5 or p.y > 30.0:
 			continue
 		if slope_at(p.x, p.z) > 0.55:
 			continue
 		if _near_poi(p, 30.0) or in_settlement(p.x, p.z):
 			continue
-		if Vector2(p.x - POND_CENTER.x, p.z - POND_CENTER.y).length() < POND_RADIUS + 6.0:
+		if Vector2(p.x - pond_center.x, p.z - pond_center.y).length() < POND_RADIUS + 6.0:
 			continue
 		var s := randf_range(0.7, 1.6)
 		var basis := Basis(Vector3.UP, randf() * TAU).scaled(Vector3(s, s * randf_range(0.85, 1.25), s))
@@ -262,8 +323,8 @@ func _scatter_rocks() -> void:
 	root.name = "Rocks"
 	add_child(root)
 
-	for i in range(70):
-		var p := random_land_point(320.0)
+	for i in range(int(round(70.0 * map_scale))):
+		var p := random_land_point(320.0 * map_scale)
 		if p.y < 1.0:
 			continue
 		if _near_poi(p, 26.0) or in_settlement(p.x, p.z):
@@ -320,24 +381,25 @@ func _is_flat(center: Vector3, radius: float, max_var: float) -> bool:
 
 
 func _build_pois() -> void:
+	var count := int(round(POI_COUNT * map_scale))
 	var tries := 0
-	while poi_centers.size() < POI_COUNT and tries < 3000:
+	while poi_centers.size() < count and tries < 4000:
 		tries += 1
 		var is_city := poi_centers.size() == CITY_INDEX
 		var p: Vector3
 		if is_city:
-			p = Vector3(CITY_CENTER.x, height_at(CITY_CENTER.x, CITY_CENTER.y), CITY_CENTER.y)
+			p = Vector3(city_center.x, height_at(city_center.x, city_center.y), city_center.y)
 		else:
-			p = random_land_point(300.0)
+			p = random_land_point(300.0 * map_scale)
 			if not _is_flat(p, 9.0, 2.2):
 				continue
-			if Vector2(p.x - CITY_CENTER.x, p.z - CITY_CENTER.y).length() < 150.0:
+			if Vector2(p.x - city_center.x, p.z - city_center.y).length() < 150.0 * map_scale:
 				continue
-			if Vector2(p.x - POND_CENTER.x, p.z - POND_CENTER.y).length() < 70.0:
+			if Vector2(p.x - pond_center.x, p.z - pond_center.y).length() < 70.0 * map_scale:
 				continue
 		var ok := true
 		for c in poi_centers:
-			if Vector2(c.x - p.x, c.z - p.z).length() < 140.0:
+			if Vector2(c.x - p.x, c.z - p.z).length() < 140.0 * map_scale:
 				ok = false
 				break
 		if not ok:
@@ -347,7 +409,7 @@ func _build_pois() -> void:
 
 	var city := poi_centers[CITY_INDEX] if poi_centers.size() > CITY_INDEX else Vector3.ZERO
 	print("[world] pond h=%.1f city=%s" % [
-		height_at(POND_CENTER.x, POND_CENTER.y), city
+		height_at(pond_center.x, pond_center.y), city
 	])
 	print("[world] POIs=%d loot spots=%d" % [poi_centers.size(), loot_spots.size()])
 
@@ -624,14 +686,14 @@ func _city_building(boxes: Array, spots: Array, c: Vector3,
 
 
 func _build_bridge() -> void:
-	var z := POND_CENTER.y
+	var z := pond_center.y
 	var deck_y := maxf(
-		maxf(height_at(POND_CENTER.x - 60.0, z), height_at(POND_CENTER.x + 60.0, z)) + 0.6,
+		maxf(height_at(pond_center.x - 60.0, z), height_at(pond_center.x + 60.0, z)) + 0.6,
 		2.0
 	)
 	var root := Node3D.new()
 	root.name = "Bridge"
-	root.position = Vector3(POND_CENTER.x, 0.0, z)
+	root.position = Vector3(pond_center.x, 0.0, z)
 	add_child(root)
 
 	var mats := {
@@ -644,8 +706,8 @@ func _build_bridge() -> void:
 	boxes.append({"size": Vector3(120.0, 1.1, 0.28), "pos": Vector3(0, deck_y + 0.85, 4.3), "mat": "trim"})
 	boxes.append({"size": Vector3(120.0, 1.1, 0.28), "pos": Vector3(0, deck_y + 0.85, -4.3), "mat": "trim"})
 
-	var hl := height_at(POND_CENTER.x - 96.0, z)
-	var hr := height_at(POND_CENTER.x + 96.0, z)
+	var hl := height_at(pond_center.x - 96.0, z)
+	var hr := height_at(pond_center.x + 96.0, z)
 	var ang_r := asin(clampf((hr - deck_y) / 36.0, -0.8, 0.8))
 	var ang_l := asin(clampf((deck_y - hl) / 36.0, -0.8, 0.8))
 	boxes.append({
@@ -663,8 +725,8 @@ func _build_bridge() -> void:
 
 	_commit_poi(root, mats, boxes)
 	bridge_points = [
-		Vector3(POND_CENTER.x - 60.0, 0.0, z),
-		Vector3(POND_CENTER.x + 60.0, 0.0, z),
+		Vector3(pond_center.x - 60.0, 0.0, z),
+		Vector3(pond_center.x + 60.0, 0.0, z),
 	]
 	print("[world] bridge deck y=%.1f" % deck_y)
 
