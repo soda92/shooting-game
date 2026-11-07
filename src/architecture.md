@@ -34,7 +34,8 @@ scripts/
   skins.gd             皮肤配色表与模型清单
   scopes.gd            瞄具参数表
   weapons.gd           武器参数表
-  world.gd             程序化岛屿、房区、物资点
+  world.gd             程序化岛屿、城区、桥、房区、物资点
+  grass.gd             玩家周围的分块草地（MultiMesh + 风摆 shader）
   zone.gd              缩圈与圈外伤害
   loot.gd              武器箱拾取
   medkit.gd            医疗包拾取
@@ -47,7 +48,7 @@ scripts/
   game.gd              开局生成、存活统计、胜负判定、训练场、观战
   hud.gd               血条、弹药、槽位、播报、配件面板、镜圈
   touch_controls.gd    虚拟摇杆、视角拖动、按钮
-  sfx.gd               音效池（2D + 3D 距离衰减）
+  sfx.gd               音效池（2D + 3D、遮挡、回声、脚步、环境音）
 ```
 
 ## 自动加载
@@ -109,6 +110,7 @@ HUD / Minimap 读取 Game 与 Player 的状态并绘制
 
 - 角色静态部件用 `SurfaceTool` 合并成少数 mesh，避免几十个 draw call
 - 地形一整块网格 + 一次三角网碰撞
-- 树用 MultiMesh
-- 音效使用固定大小的播放器池
+- 树和城区盒子都用 `SurfaceTool` 按材质合并
+- 草只保留玩家周围 7 × 7 个区块，跨区块时才重建 MultiMesh
+- 音效使用固定大小的 2D / 3D / Echo 播放器池
 - 小地图贴图只生成一次，之后每帧只画点

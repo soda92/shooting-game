@@ -15,6 +15,7 @@ enum State { DROP, PLAY, DEAD }
 const WALK := 6.0
 const SPRINT := 9.5
 const AIM_WALK := 3.6
+const SWIM_SPEED := 3.4
 const JUMP_V := 6.8
 const GRAVITY := 20.0
 const LOOK_SENS := 0.0032
@@ -207,13 +208,20 @@ func _process_drop(delta: float) -> void:
 	velocity.z = dir.z * 9.0
 	move_and_slide()
 
-	var ground: float = world.height_at(global_position.x, global_position.z) + 1.0
+	var water_h: float = world.height_at(global_position.x, global_position.z)
+	var ground: float = water_h + 1.0
+	if water_h < -0.6:
+		ground = 0.45
 	if global_position.y <= ground or is_on_floor():
 		global_position.y = maxf(ground, global_position.y)
 		velocity = Vector3.ZERO
 		state = State.PLAY
 		_chute_open = false
 		parachute.close()
+		if water_h < -0.6:
+			Sfx.play("footstep_water_1", -7.0, randf_range(0.9, 1.0))
+		else:
+			Sfx.play("land", -6.0, randf_range(0.95, 1.05))
 		landed.emit()
 
 
@@ -223,33 +231,54 @@ func _process_play(delta: float) -> void:
 	dir.y = 0.0
 	dir = dir.limit_length(1.0)
 
+	var water_h: float = world.height_at(global_position.x, global_position.z) if world != null else 999.0
+	var swimming := water_h < -0.6 and global_position.y < 1.2
+
 	var speed := WALK
 	if InputState.aim:
 		speed = AIM_WALK
 	elif InputState.sprint and input.y > 0.25:
 		speed = SPRINT
-
-	if world != null and world.height_at(global_position.x, global_position.z) < -0.6:
-		speed *= 0.45
-		if global_position.y < 0.9:
-			velocity.y = maxf(velocity.y, 3.5)
+	if swimming:
+		speed = SWIM_SPEED
 
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
 
-	if is_on_floor() and dir.length() > 0.15:
+	if swimming:
+		# Buoyancy keeps the player bobbing at the surface.
+		velocity.y = clampf((0.2 - global_position.y) * 6.0, -3.0, 4.0)
+		InputState.consume_jump()
+	else:
+		if not is_on_floor():
+			velocity.y -= GRAVITY * delta
+		elif InputState.consume_jump():
+			velocity.y = JUMP_V
+
+	if not swimming and is_on_floor() and dir.length() > 0.15:
 		_step_t -= delta
 		if _step_t <= 0.0:
 			_step_t = 0.30 if InputState.sprint else 0.44
-			Sfx.footstep(-18.0)
+			Sfx.footstep(_surface(), -18.0)
 
-	var want_jump := InputState.consume_jump()
-	if not is_on_floor():
-		velocity.y -= GRAVITY * delta
-	elif want_jump:
-		velocity.y = JUMP_V
-
+	var was_floor := is_on_floor()
+	var fall_v := velocity.y
 	move_and_slide()
+	if not was_floor and is_on_floor() and fall_v < -5.0:
+		Sfx.play("land", -7.0, randf_range(0.95, 1.05))
+
+
+func _surface() -> String:
+	if world == null:
+		return "grass"
+	var h: float = world.height_at(global_position.x, global_position.z)
+	if h < -0.6 and global_position.y < 1.2:
+		return "water"
+	if world.in_settlement(global_position.x, global_position.z):
+		return "concrete"
+	if h < 1.4:
+		return "sand"
+	return "grass"
 
 
 func _shoot() -> void:
@@ -291,6 +320,8 @@ func _shoot() -> void:
 						dmg *= 2.0
 						is_head = true
 				c.take_damage(dmg, self)
+				if c.has_method("is_alive"):
+					Sfx.play_at("hit_flesh", hit["position"], -4.0, randf_range(0.95, 1.05))
 				any_hit = true
 				if is_head:
 					any_head = true

@@ -4,15 +4,15 @@ extends Node3D
 signal phase_changed(index: int)
 
 const PHASES := [
-	{"wait": 35.0, "to": 130.0, "time": 35.0, "dps": 2.0},
-	{"wait": 25.0, "to": 82.0, "time": 30.0, "dps": 4.0},
-	{"wait": 20.0, "to": 44.0, "time": 25.0, "dps": 7.0},
-	{"wait": 15.0, "to": 18.0, "time": 20.0, "dps": 11.0},
-	{"wait": 10.0, "to": 0.0, "time": 25.0, "dps": 16.0},
+	{"wait": 35.0, "to": 280.0, "time": 40.0, "dps": 2.0},
+	{"wait": 30.0, "to": 170.0, "time": 35.0, "dps": 4.0},
+	{"wait": 25.0, "to": 90.0, "time": 30.0, "dps": 7.0},
+	{"wait": 20.0, "to": 40.0, "time": 25.0, "dps": 11.0},
+	{"wait": 15.0, "to": 0.0, "time": 25.0, "dps": 16.0},
 ]
 
 var center := Vector3.ZERO
-var radius := 215.0
+var radius := 420.0
 var dps := 2.0
 var shrinking := false
 var training := false

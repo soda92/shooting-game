@@ -27,6 +27,7 @@ var _wander := Vector3.ZERO
 var _wander_t := 0.0
 var _strafe := 1.0
 var _stuck_t := 0.0
+var _step_t := 0.0
 var _last_pos := Vector3.ZERO
 var _alert := false
 var _alert_t := 0.0
@@ -117,13 +118,25 @@ func _physics_process(delta: float) -> void:
 				desired = to_c.normalized()
 				rotation.y = lerp_angle(rotation.y, atan2(-desired.x, -desired.z), 6.0 * delta)
 
-	velocity.x = desired.x * SPEED
-	velocity.z = desired.z * SPEED
-	if not is_on_floor():
+	var water_h: float = world.height_at(global_position.x, global_position.z) if world != null else 999.0
+	var swimming := water_h < -0.6 and global_position.y < 1.2
+
+	velocity.x = desired.x * SPEED * (0.6 if swimming else 1.0)
+	velocity.z = desired.z * SPEED * (0.6 if swimming else 1.0)
+	if swimming:
+		velocity.y = clampf((0.2 - global_position.y) * 6.0, -3.0, 4.0)
+	elif not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	else:
 		velocity.y = 0.0
 	move_and_slide()
+
+	_step_t -= delta
+	if _step_t <= 0.0 and not swimming and is_on_floor() and Vector2(velocity.x, velocity.z).length() > 1.2:
+		_step_t = 0.52
+		if game != null and is_instance_valid(game.player):
+			if global_position.distance_to(game.player.global_position) < 55.0:
+				Sfx.footstep_at(global_position, _surface(), -15.0)
 
 	_stuck_t += delta
 	if _stuck_t >= 0.7:
@@ -191,6 +204,19 @@ func _can_see(t: Node3D) -> bool:
 	var params := PhysicsRayQueryParameters3D.create(from, to, 1, [get_rid()])
 	var hit := get_world_3d().direct_space_state.intersect_ray(params)
 	return hit.is_empty() or hit["collider"] == t
+
+
+func _surface() -> String:
+	if world == null:
+		return "grass"
+	var h: float = world.height_at(global_position.x, global_position.z)
+	if h < -0.6 and global_position.y < 1.2:
+		return "water"
+	if world.in_settlement(global_position.x, global_position.z):
+		return "concrete"
+	if h < 1.4:
+		return "sand"
+	return "grass"
 
 
 func _pick_wander() -> void:

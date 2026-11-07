@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="Script" path="res://scripts/world.gd" id="2_world"]
 [ext_resource type="Script" path="res://scripts/zone.gd" id="3_zone"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="4_hud"]
 [ext_resource type="Script" path="res://scripts/touch_controls.gd" id="5_touch"]
+[ext_resource type="Script" path="res://scripts/grass.gd" id="6_grass"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.18, 0.36, 0.66, 1)
@@ -54,6 +55,9 @@ shadow_enabled = false
 
 [node name="World" type="Node3D" parent="."]
 script = ExtResource("2_world")
+
+[node name="Grass" type="Node3D" parent="World"]
+script = ExtResource("6_grass")
 
 [node name="Zone" type="Node3D" parent="."]
 script = ExtResource("3_zone")

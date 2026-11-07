@@ -1,7 +1,7 @@
 extends Control
 ## Top-down minimap: island texture, safe zone, loot, scanned enemies, player.
 
-const MAP_RANGE := 230.0
+const MAP_RANGE := 460.0
 
 var game
 
@@ -31,7 +31,7 @@ func setup(g: Node) -> void:
 func _build_texture() -> void:
 	if game == null or game.world == null:
 		return
-	var n := 128
+	var n := 192
 	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
 	for py in range(n):
 		var wz := -MAP_RANGE + (py + 0.5) / float(n) * MAP_RANGE * 2.0
@@ -82,6 +82,14 @@ func _draw() -> void:
 	if tr > 0.0 and tr < game.zone.radius:
 		var tc := _to_map(game.zone.target_center())
 		draw_arc(tc, tr * scale, 0.0, TAU, 72, Color(1, 1, 1, 0.45), 1.0)
+
+	# bridge
+	if game.world.bridge_points.size() == 2:
+		draw_line(
+			_to_map(game.world.bridge_points[0]),
+			_to_map(game.world.bridge_points[1]),
+			Color(0.86, 0.80, 0.62, 0.95), 2.5
+		)
 
 	# POI markers
 	for c in game.world.poi_centers:
