@@ -16,6 +16,7 @@ var touch_move := Vector2.ZERO
 var touch_fire := false
 var touch_aim := false
 var touch_sprint := false
+var aim_toggle := false
 
 var medkit_queued := false
 var scan_queued := false
@@ -94,7 +95,7 @@ func _process(_delta: float) -> void:
 
 	var use_mouse := not OS.has_feature("mobile")
 	sprint = touch_sprint or Input.is_key_pressed(KEY_SHIFT)
-	aim = touch_aim or (use_mouse and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
+	aim = aim_toggle or touch_aim or (use_mouse and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
 	fire = touch_fire or (use_mouse and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 
 
@@ -151,6 +152,7 @@ func clear() -> void:
 	look = Vector2.ZERO
 	fire = false
 	aim = false
+	aim_toggle = false
 	sprint = false
 	jump_queued = false
 	reload_queued = false

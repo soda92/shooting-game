@@ -605,6 +605,7 @@ func _toggle_attach() -> void:
 		return
 	_refresh_attach()
 	_attach_root.visible = true
+	InputState.aim_toggle = false
 	InputState.locked = true
 
 

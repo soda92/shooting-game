@@ -115,7 +115,8 @@ func _apply(name: String, on: bool) -> void:
 	if name == "fire" or name == "fire_l":
 		InputState.touch_fire = _any_fire_down()
 	elif name == "aim":
-		InputState.touch_aim = on
+		if on:
+			InputState.aim_toggle = not InputState.aim_toggle
 	elif name == "jump":
 		if on:
 			InputState.jump_queued = true
@@ -201,6 +202,8 @@ func _draw() -> void:
 			fill = Color(1, 1, 1, 0.05 * a)
 		if name == "view" and InputState.first_person and not pressed:
 			fill = Color(0.35, 0.70, 1.0, 0.35 * a)
+		if name == "aim" and InputState.aim:
+			fill = Color(1.0, 0.55, 0.25, 0.42 * a)
 		draw_circle(p, r, fill)
 		draw_arc(p, r, 0.0, TAU, 44, Color(1, 1, 1, 0.30 * a), 2.0)
 

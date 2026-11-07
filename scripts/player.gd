@@ -478,6 +478,7 @@ func switch_weapon() -> void:
 		return
 	active = other
 	switching = 0.4
+	InputState.aim_toggle = false
 	_reloading = false
 	_reload_t = 0.0
 	_fire_cd = 0.1
