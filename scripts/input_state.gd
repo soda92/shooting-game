@@ -19,6 +19,7 @@ var touch_sprint := false
 
 var medkit_queued := false
 var scan_queued := false
+var switch_queued := false
 var first_person := false
 
 # mirrored from the player for UI display
@@ -30,6 +31,7 @@ var _prev_reload := false
 var _prev_medkit := false
 var _prev_scan := false
 var _prev_view := false
+var _prev_switch := false
 
 
 func _ready() -> void:
@@ -84,6 +86,11 @@ func _process(_delta: float) -> void:
 		first_person = not first_person
 	_prev_view = vw
 
+	var sw := Input.is_key_pressed(KEY_Q)
+	if sw and not _prev_switch:
+		switch_queued = true
+	_prev_switch = sw
+
 	var use_mouse := not OS.has_feature("mobile")
 	sprint = touch_sprint or Input.is_key_pressed(KEY_SHIFT)
 	aim = touch_aim or (use_mouse and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT))
@@ -125,6 +132,12 @@ func consume_scan() -> bool:
 	return v
 
 
+func consume_switch() -> bool:
+	var v := switch_queued
+	switch_queued = false
+	return v
+
+
 func clear() -> void:
 	move = Vector2.ZERO
 	touch_move = Vector2.ZERO
@@ -136,3 +149,4 @@ func clear() -> void:
 	reload_queued = false
 	medkit_queued = false
 	scan_queued = false
+	switch_queued = false

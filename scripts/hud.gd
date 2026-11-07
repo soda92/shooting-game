@@ -86,7 +86,7 @@ class Scope extends Control:
 		if alpha <= 0.01 or game == null or game.player == null:
 			return
 
-		var sniper: bool = String(game.player.weapon_id) == "sniper"
+		var sniper: bool = String(game.player.weapon_id()) == "sniper"
 		var c := size * 0.5
 		var inner: float = minf(size.x, size.y) * (0.31 if sniper else 0.40)
 		var outer: float = size.length() * 0.5 + 24.0
@@ -122,6 +122,7 @@ var _hp_fill: ColorRect
 var _hp_label: Label
 var _med_label: Label
 var _ammo_label: Label
+var _slots_label: RichTextLabel
 var _alive_label: Label
 var _zone_label: Label
 var _center_label: Label
@@ -233,7 +234,16 @@ func _build() -> void:
 	_ammo_label = _make_label("30 / 150\nM4 步枪", 30)
 	_ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_ammo_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	_place(_ammo_label, 1.0, 1.0, 1.0, 1.0, -380, -120, -30, -28)
+	_place(_ammo_label, 1.0, 1.0, 1.0, 1.0, -460, -120, -200, -28)
+
+	_slots_label = RichTextLabel.new()
+	_slots_label.bbcode_enabled = true
+	_slots_label.fit_content = true
+	_slots_label.scroll_active = false
+	_slots_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_slots_label.add_theme_font_size_override("normal_font_size", 20)
+	_place(_slots_label, 1.0, 1.0, 1.0, 1.0, -540, -170, -200, -126)
+	add_child(_slots_label)
 
 	_alive_label = _make_label("存活 12  ·  击杀 0", 24)
 	_alive_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -332,7 +342,8 @@ func update_hud() -> void:
 	_hp_fill.color = Color(0.90, 0.25, 0.20) if hpr < 0.35 else Color(0.30, 0.85, 0.42)
 	_hp_label.text = "%d HP" % int(ceil(p.health))
 	_med_label.text = "医疗包 x%d" % p.medkits
-	_ammo_label.text = "%d / %d\n%s" % [p.mag, p.reserve, String(Weapons.get_def(p.weapon_id)["label"])]
+	_ammo_label.text = "%d / %d\n%s" % [p.mag(), p.reserve(), String(Weapons.get_def(p.weapon_id())["label"])]
+	_slots_label.text = _slot_text(p)
 	_alive_label.text = "存活 %d  ·  击杀 %d" % [game.alive, game.kills]
 	_zone_label.text = game.zone.status_text()
 
@@ -341,6 +352,21 @@ func update_hud() -> void:
 	elif _hint_t <= 0.0:
 		_hint_label.text = ""
 	_fps_label.text = "%d FPS" % Engine.get_frames_per_second()
+
+
+func _slot_text(p) -> String:
+	var parts: Array[String] = []
+	for i in range(p.slots.size()):
+		var s: Dictionary = p.slots[i]
+		if s.is_empty():
+			parts.append("[color=#55636e]%d --[/color]" % (i + 1))
+		else:
+			var nm := String(Weapons.get_def(String(s["id"]))["short"])
+			if i == int(p.active):
+				parts.append("[color=#ffffff][b]%d %s[/b][/color]" % [i + 1, nm])
+			else:
+				parts.append("[color=#93a6b6]%d %s[/color]" % [i + 1, nm])
+	return "[right]" + "     ".join(parts) + "[/right]"
 
 
 func flash_hit() -> void:

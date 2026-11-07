@@ -47,6 +47,7 @@ func _layout() -> void:
 		"medkit": {"pos": Vector2(s.x * 0.720, s.y * 0.885), "r": m * 0.052, "label": "医疗"},
 		"scan": {"pos": Vector2(s.x * 0.640, s.y * 0.760), "r": m * 0.050, "label": "侦察"},
 		"view": {"pos": Vector2(s.x * 0.885, s.y * 0.500), "r": m * 0.052, "label": "视角"},
+		"switch": {"pos": Vector2(s.x * 0.580, s.y * 0.905), "r": m * 0.050, "label": "切换"},
 	}
 	queue_redraw()
 
@@ -126,6 +127,9 @@ func _apply(name: String, on: bool) -> void:
 	elif name == "view":
 		if on:
 			InputState.first_person = not InputState.first_person
+	elif name == "switch":
+		if on:
+			InputState.switch_queued = true
 	queue_redraw()
 
 

@@ -29,9 +29,9 @@ var game
 var state := State.DROP
 var health := 100.0
 var max_health := 100.0
-var weapon_id := "rifle"
-var mag := 30
-var reserve := 150
+var slots: Array = []
+var active := 0
+var switching := 0.0
 var medkits := 0
 var scan_t := 0.0
 var scan_cd := 0.0
@@ -57,7 +57,8 @@ func _ready() -> void:
 	if not OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	visual.set_skin(Skins.player_skin())
-	_apply_weapon(weapon_id)
+	slots = [_make_slot("rifle"), {}]
+	active = 0
 	spring.rotation.x = pitch
 
 
@@ -86,9 +87,9 @@ func _process(delta: float) -> void:
 	var target_fov := 72.0
 	if ads:
 		if fp:
-			target_fov = 30.0 if weapon_id == "sniper" else 46.0
+			target_fov = 30.0 if weapon_id() == "sniper" else 46.0
 		else:
-			target_fov = 38.0 if weapon_id == "sniper" else 50.0
+			target_fov = 38.0 if weapon_id() == "sniper" else 50.0
 	_fov = lerpf(_fov, target_fov, 1.0 - exp(-9.0 * delta))
 	cam.fov = _fov
 
@@ -104,6 +105,7 @@ func _process(delta: float) -> void:
 	scan_t = maxf(0.0, scan_t - delta)
 	scan_cd = maxf(0.0, scan_cd - delta)
 	_hurt_cd = maxf(0.0, _hurt_cd - delta)
+	switching = maxf(0.0, switching - delta)
 	InputState.medkit_count = medkits
 	InputState.scan_cd = scan_cd
 
@@ -116,6 +118,9 @@ func _process(delta: float) -> void:
 		return
 
 	_fire_cd = maxf(0.0, _fire_cd - delta)
+
+	if InputState.consume_switch():
+		switch_weapon()
 
 	if InputState.consume_medkit():
 		use_medkit()
@@ -130,7 +135,7 @@ func _process(delta: float) -> void:
 		if _reload_t <= 0.0:
 			_finish_reload()
 
-	if InputState.fire and _fire_cd <= 0.0 and not _reloading:
+	if InputState.fire and _fire_cd <= 0.0 and not _reloading and switching <= 0.0:
 		_shoot()
 
 
@@ -202,15 +207,16 @@ func _process_play(delta: float) -> void:
 
 
 func _shoot() -> void:
-	var def := Weapons.get_def(weapon_id)
-	if mag <= 0:
+	var id := weapon_id()
+	var def := Weapons.get_def(id)
+	if mag() <= 0:
 		Sfx.play("empty", -8.0)
 		_start_reload()
 		return
 
-	mag -= 1
-	Sfx.play("shot_" + weapon_id, -2.0, randf_range(0.95, 1.06))
-	_fire_cd = Weapons.shot_interval(weapon_id)
+	slots[active]["mag"] = mag() - 1
+	Sfx.play("shot_" + id, -2.0, randf_range(0.95, 1.06))
+	_fire_cd = Weapons.shot_interval(id)
 
 	var spray := deg_to_rad(float(def["spread_deg"]))
 	var origin := cam.global_position
@@ -288,10 +294,10 @@ func _spawn_tracer(from: Vector3, to: Vector3) -> void:
 
 
 func _start_reload() -> void:
-	if _reloading:
+	if _reloading or switching > 0.0:
 		return
-	var def := Weapons.get_def(weapon_id)
-	if mag >= int(def["mag"]) or reserve <= 0:
+	var def := Weapons.get_def(weapon_id())
+	if mag() >= int(def["mag"]) or reserve() <= 0:
 		return
 	_reloading = true
 	_reload_t = float(def["reload"])
@@ -299,29 +305,76 @@ func _start_reload() -> void:
 
 
 func _finish_reload() -> void:
-	var def := Weapons.get_def(weapon_id)
-	var need := int(def["mag"]) - mag
-	var take := mini(need, reserve)
-	mag += take
-	reserve -= take
+	var def := Weapons.get_def(weapon_id())
+	var need := int(def["mag"]) - mag()
+	var take := mini(need, reserve())
+	slots[active]["mag"] = mag() + take
+	slots[active]["reserve"] = reserve() - take
 	_reloading = false
 
 
-func _apply_weapon(id: String) -> void:
+func _make_slot(id: String) -> Dictionary:
 	var def := Weapons.get_def(id)
-	weapon_id = id
-	mag = int(def["mag"])
-	reserve = int(def["reserve"])
-	_reloading = false
-	_reload_t = 0.0
+	return {"id": id, "mag": int(def["mag"]), "reserve": int(def["reserve"])}
+
+
+func weapon_id() -> String:
+	if slots.is_empty() or slots[active].is_empty():
+		return "rifle"
+	return String(slots[active]["id"])
+
+
+func mag() -> int:
+	if slots.is_empty() or slots[active].is_empty():
+		return 0
+	return int(slots[active]["mag"])
+
+
+func reserve() -> int:
+	if slots.is_empty() or slots[active].is_empty():
+		return 0
+	return int(slots[active]["reserve"])
 
 
 func give_weapon(id: String) -> void:
 	if not Weapons.DEFS.has(id):
 		return
-	_apply_weapon(id)
+
+	var empty := -1
+	for i in range(slots.size()):
+		if slots[i].is_empty():
+			empty = i
+			break
+
+	if empty != -1:
+		slots[empty] = _make_slot(id)
+		active = empty
+	else:
+		# Both slots are full: drop the current weapon and take this one.
+		var old := weapon_id()
+		if game != null and game.has_method("drop_weapon_at"):
+			game.drop_weapon_at(old, global_position)
+		slots[active] = _make_slot(id)
+
+	_reloading = false
+	_reload_t = 0.0
+	_fire_cd = 0.0
 	Sfx.play("pickup", -4.0)
 	weapon_changed.emit(id)
+
+
+func switch_weapon() -> void:
+	if switching > 0.0 or slots.size() < 2:
+		return
+	var other := 1 - active
+	if slots[other].is_empty():
+		return
+	active = other
+	switching = 0.4
+	_reloading = false
+	_reload_t = 0.0
+	_fire_cd = 0.1
+	Sfx.play("reload", -9.0, 1.2)
 
 
 func add_medkit() -> bool:

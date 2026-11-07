@@ -110,6 +110,14 @@ func spawn_medkit_at(pos: Vector3) -> void:
 	add_child(m)
 
 
+func drop_weapon_at(id: String, pos: Vector3) -> void:
+	var scene: PackedScene = load("res://scenes/loot.tscn")
+	var l = scene.instantiate()
+	l.position = Vector3(pos.x, world.height_at(pos.x, pos.z) + 0.9, pos.z)
+	add_child(l)
+	l.setup(id, 1.0)
+
+
 # --------------------------------------------------------------------------
 # Signals
 # --------------------------------------------------------------------------
