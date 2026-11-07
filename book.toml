@@ -1,0 +1,16 @@
+[book]
+title = "Island Royale 开发手册"
+authors = ["Island Royale"]
+language = "zh-CN"
+src = "src"
+description = "离线单机吃鸡原型：玩法、构建、架构与调参"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+
+[output.html.search]
+enable = true

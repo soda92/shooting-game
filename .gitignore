@@ -38,3 +38,6 @@ build/
 *.apk
 *.idsig
 export_credentials.cfg
+
+# mdBook
+book/
