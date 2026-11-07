@@ -320,6 +320,22 @@ func _build_settings() -> void:
 	r4.add_child(_gyro_check)
 	vbox.add_child(r4)
 
+	var credit := _label(
+		"音效素材：Vincent Sevedge · congusbongus · Fantozzi · BMacZero(CC BY 3.0 / CC0)",
+		12,
+		Color(0.72, 0.78, 0.86, 0.75)
+	)
+	credit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(credit)
+
+	var credit2 := _label(
+		"原始脚步录音：swuing · EminYILDIRIM(Freesound)",
+		11,
+		Color(0.72, 0.78, 0.86, 0.6)
+	)
+	credit2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(credit2)
+
 	var close := _button("关闭", 20)
 	close.custom_minimum_size = Vector2(560, 44)
 	close.pressed.connect(_toggle_settings)

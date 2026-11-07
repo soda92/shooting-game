@@ -9,9 +9,11 @@ import math
 import os
 import random
 import struct
+import sys
 import wave
 
 SR = 44100
+FORCE = "--force" in sys.argv
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(os.path.dirname(HERE), "assets", "audio")
 os.makedirs(OUT, exist_ok=True)
@@ -32,6 +34,13 @@ def fade_out(x, n=256):
 
 
 def write_wav(name, data, peak=0.9, channels=1):
+    # Real recordings are imported by tools/import_real_sfx.py. Do not
+    # clobber them unless explicitly asked (python3 tools/gen_sfx.py --force).
+    protected = name.startswith(("shot_", "footstep_")) or name == "reload"
+    path = os.path.join(OUT, name + ".wav")
+    if protected and os.path.exists(path) and not FORCE:
+        print(f"{name:22s} keep existing (real)")
+        return
     if channels == 2:
         left, right = data
         m = max(1e-9, max(max(abs(v) for v in left), max(abs(v) for v in right)))

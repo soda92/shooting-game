@@ -8,6 +8,7 @@ export_presets.cfg     Android 导出预设（arm64-v8a）
 book.toml              mdBook 配置
 src/                   本文档源文件
 tools/gen_sfx.py       占位音效生成脚本
+tools/import_real_sfx.py  真实录音裁切/归一化导入脚本
 tools/make_anime_skin.py  Blender 二次元角色生成脚本
 assets/
   audio/               音效 WAV

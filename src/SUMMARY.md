@@ -22,4 +22,5 @@
 # 其他
 
 - [已知限制与路线](limitations.md)
+- [素材鸣谢](credits.md)
 - [开发日志](changelog.md)

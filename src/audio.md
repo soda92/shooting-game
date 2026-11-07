@@ -1,7 +1,12 @@
 # 音效系统
 
-音效全部在 `assets/audio/`，短音效是 16-bit WAV，环境音是立体声 WAV。
-占位素材由 `tools/gen_sfx.py` 合成；**真实素材**直接覆盖同名文件即可。
+音效全部在 `assets/audio/`，短音效是 16-bit 44.1kHz WAV，环境音是立体声 WAV。
+
+- **枪声 / 脚步 / 换弹**：已换成真实录音，由 `tools/import_real_sfx.py` 裁切、归一化后写入
+- **UI / 爆炸 / 落地 / 鸟叫 / 风浪**：仍由 `tools/gen_sfx.py` 合成
+- 两家脚本都不会互相覆盖：`gen_sfx.py` 默认跳过已存在的 `shot_*`、`footstep_*`、`reload`，需要重做占位素材时加 `--force`
+
+素材授权与作者见仓库根目录的 [`CREDITS.md`](../CREDITS.md)。
 
 ## API
 
@@ -16,9 +21,13 @@ Sfx.footstep_at(pos, "concrete", -15.0)      # 3D：敌人脚步
 
 ## 现在的声音结构
 
-### 枪声：五层叠加
+### 枪声：真实录音 + 变体
 
-每把枪有 3 个随机变体（`shot_rifle_1..3` 等），`Sfx` 每次随机选一个：
+每把枪有 3 个随机变体（`shot_rifle_1..3` 等），来自真实录音的不同击发，
+`Sfx` 每次随机选一个。当前录音是 SKS、CZ-52、Mosin 和霰弹枪；SMG 用 CZ-52
+轻微升调以贴近冲锋枪的音色。
+
+如果替换成合成的 fallback，`tools/gen_sfx.py` 仍按五层结构生成：
 
 | 层 | 作用 |
 |---|---|
@@ -74,6 +83,38 @@ AI 的脚步从 3D 位置播放，55m 内有效，是判断敌人方位的重要
 4. **空间化**：3D 衰减、低通、遮挡、混响/回声；声音的“位置”比音色更能骗过耳朵。
 5. **材质化**：脚步、命中、弹壳落地按表面/材质区分。
 6. **混音**：压缩 + 限制器，保证多声部不爆音；用 EQ 给枪声留出中高频空间。
+
+## 当前使用的真实素材
+
+| 用途 | 素材 | 作者 | 许可 |
+|---|---|---|---|
+| 枪声 | [Gunshot Sounds](https://opengameart.org/content/gunshot-sounds) | Vincent Sevedge | CC BY 3.0 |
+| 草地/水声脚步 | [Footsteps on different surfaces](https://opengameart.org/content/footsteps-on-different-surfaces) | congusbongus | CC BY 3.0 |
+| 沙地/混凝土脚步 | [Fantozzi's Footsteps](https://opengameart.org/content/fantozzis-footsteps-grasssand-stone) | Fantozzi | CC0 |
+| 换弹 | [Gun Reload Sound Effects](https://opengameart.org/content/gun-reload-sound-effects) | BMacZero | CC0 |
+
+完整署名和原始 Freesound 链接见 [`CREDITS.md`](../CREDITS.md)。
+
+## 重新导入真实素材
+
+```bash
+# 先把素材包解压到 /tmp/opencode（目录结构见脚本头部注释）
+python3 tools/import_real_sfx.py --src /tmp/opencode
+godot --headless --editor --path . --quit   # 重新导入 WAV
+```
+
+脚本会：
+
+- 按 onset 从长录音里切出单发，去掉前置静音，峰值归一化到 0.9
+- 用 `scipy.signal.resample_poly` 统一到 44.1kHz，转单声道
+- 生成 `shot_<weapon>_1..3`、`footstep_<surface>_1..3` 和 `reload`
+
+## 更多素材来源
+
+- Kenney（CC0，可直接商用）：<https://kenney.nl/assets?q=audio>
+- Freesound（CC0 / CC-BY，注意署名）：<https://freesound.org>
+- Sonniss GDC 音频包（免费商用）：<https://sonniss.com/gameaudiogdc>
+- OpenGameArt（CC0 / CC-BY）：<https://opengameart.org/art-search-advanced?field_art_type_tid%5B%5D=13>
 
 ## 素材命名
 
