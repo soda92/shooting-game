@@ -8,6 +8,11 @@ const WATER_LEVEL := 0.0
 var _noise := FastNoiseLite.new()
 var _tint := FastNoiseLite.new()
 
+var poi_centers: Array[Vector3] = []
+var loot_spots: Array[Vector3] = []
+
+const POI_COUNT := 3
+
 
 func _ready() -> void:
 	_noise.seed = 20261107
@@ -20,6 +25,7 @@ func _ready() -> void:
 
 	_build_terrain()
 	_build_water()
+	_build_pois()
 	_scatter_trees()
 	_scatter_rocks()
 
@@ -49,6 +55,14 @@ func random_land_point(max_radius := 175.0) -> Vector3:
 		if is_land(x, z, 1.5):
 			return Vector3(x, height_at(x, z), z)
 	return Vector3(0.0, height_at(0.0, 0.0), 0.0)
+
+
+func random_open_point(max_radius: float, poi_clear: float) -> Vector3:
+	for i in range(40):
+		var p := random_land_point(max_radius)
+		if not _near_poi(p, poi_clear):
+			return p
+	return random_land_point(max_radius)
 
 
 func slope_at(x: float, z: float) -> float:
@@ -185,6 +199,8 @@ func _scatter_trees() -> void:
 			continue
 		if slope_at(p.x, p.z) > 0.55:
 			continue
+		if _near_poi(p, 22.0):
+			continue
 		var s := randf_range(0.7, 1.6)
 		var basis := Basis(Vector3.UP, randf() * TAU).scaled(Vector3(s, s * randf_range(0.85, 1.25), s))
 		transforms.append(Transform3D(basis, Vector3(p.x, p.y + 2.2 * s, p.z)))
@@ -223,6 +239,8 @@ func _scatter_rocks() -> void:
 		var p := random_land_point(160.0)
 		if p.y < 1.0:
 			continue
+		if _near_poi(p, 18.0):
+			continue
 		var s := randf_range(0.8, 2.4)
 		var body := StaticBody3D.new()
 		body.position = Vector3(p.x, p.y + 1.0 * s, p.z)
@@ -241,3 +259,179 @@ func _scatter_rocks() -> void:
 		body.add_child(col)
 
 		root.add_child(body)
+
+
+# --------------------------------------------------------------------------
+# Points of interest
+# --------------------------------------------------------------------------
+
+func _near_poi(p: Vector3, radius: float) -> bool:
+	for c in poi_centers:
+		if Vector2(c.x - p.x, c.z - p.z).length() < radius:
+			return true
+	return false
+
+
+func _is_flat(center: Vector3, radius: float, max_var: float) -> bool:
+	var lo := center.y
+	var hi := center.y
+	for i in range(8):
+		var a := TAU * float(i) / 8.0
+		var h := height_at(center.x + cos(a) * radius, center.z + sin(a) * radius)
+		lo = minf(lo, h)
+		hi = maxf(hi, h)
+	return (hi - lo) <= max_var and lo > 1.5
+
+
+func _build_pois() -> void:
+	var tries := 0
+	while poi_centers.size() < POI_COUNT and tries < 1500:
+		tries += 1
+		var p := random_land_point(150.0)
+		if not _is_flat(p, 9.0, 2.2):
+			continue
+		var ok := true
+		for c in poi_centers:
+			if Vector2(c.x - p.x, c.z - p.z).length() < 80.0:
+				ok = false
+				break
+		if not ok:
+			continue
+		_build_compound(p, poi_centers.size())
+		poi_centers.append(p)
+
+	print("[world] POIs=%d loot spots=%d" % [poi_centers.size(), loot_spots.size()])
+
+
+func _poi_mat(c: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.roughness = 0.9
+	return m
+
+
+func _max_height_near(center: Vector3, radius: float) -> float:
+	var hi := height_at(center.x, center.z)
+	for i in range(8):
+		var a := TAU * float(i) / 8.0
+		hi = maxf(hi, height_at(center.x + cos(a) * radius, center.z + sin(a) * radius))
+	return hi
+
+
+func _build_compound(p: Vector3, index: int) -> void:
+	var root := Node3D.new()
+	root.position = Vector3(p.x, _max_height_near(p, 8.0) + 0.05, p.z)
+	root.rotation.y = float(index) * (PI * 0.5) + randf_range(-0.35, 0.35)
+	add_child(root)
+
+	var mats := {
+		"wall": _poi_mat(Color(0.68, 0.64, 0.56)),
+		"roof": _poi_mat(Color(0.22, 0.23, 0.26)),
+		"metal": _poi_mat(Color(0.42, 0.24, 0.18)),
+		"trim": _poi_mat(Color(0.34, 0.35, 0.38)),
+	}
+
+	var boxes: Array = []
+	var spots: Array = []
+
+	match index % 3:
+		0:
+			_house_boxes(boxes, spots)
+		1:
+			_warehouse_boxes(boxes, spots)
+		_:
+			_yard_boxes(boxes, spots)
+
+	boxes.append({"size": Vector3(1.2, 1.2, 1.2), "pos": Vector3(7.0, 0.6, -2.0), "mat": "trim"})
+	boxes.append({"size": Vector3(1.2, 1.2, 1.2), "pos": Vector3(-7.0, 0.6, 3.0), "mat": "trim"})
+	spots.append(Vector3(7.0, 0.0, -3.5))
+	spots.append(Vector3(-7.0, 0.0, 4.5))
+
+	_commit_poi(root, mats, boxes)
+
+	for s in spots:
+		loot_spots.append(root.to_global(Vector3(s.x, 0.0, s.z)))
+
+
+func _commit_poi(root: Node3D, mats: Dictionary, boxes: Array) -> void:
+	var body := StaticBody3D.new()
+	root.add_child(body)
+
+	var groups := {}
+	for b in boxes:
+		var key: String = b["mat"]
+		if not groups.has(key):
+			var st := SurfaceTool.new()
+			st.begin(Mesh.PRIMITIVE_TRIANGLES)
+			groups[key] = st
+
+		var bm := BoxMesh.new()
+		bm.size = b["size"]
+		groups[key].append_from(bm, 0, Transform3D(Basis(), b["pos"]))
+
+		var shape := BoxShape3D.new()
+		shape.size = b["size"]
+		var col := CollisionShape3D.new()
+		col.shape = shape
+		col.position = b["pos"]
+		body.add_child(col)
+
+	for key in groups:
+		var mi := MeshInstance3D.new()
+		mi.mesh = groups[key].commit()
+		mi.material_override = mats[key]
+		root.add_child(mi)
+
+
+func _house_boxes(boxes: Array, spots: Array) -> void:
+	var ext := 2.2
+	var total_h := 3.0 + ext
+	var cy := (3.0 - ext) * 0.5
+
+	boxes.append({"size": Vector3(6.0, total_h, 0.25), "pos": Vector3(0, cy, 3.0), "mat": "wall"})
+	boxes.append({"size": Vector3(0.25, total_h, 6.0), "pos": Vector3(-3.0, cy, 0), "mat": "wall"})
+	boxes.append({"size": Vector3(0.25, total_h, 6.0), "pos": Vector3(3.0, cy, 0), "mat": "wall"})
+	boxes.append({"size": Vector3(2.4, total_h, 0.25), "pos": Vector3(-1.8, cy, -3.0), "mat": "wall"})
+	boxes.append({"size": Vector3(2.4, total_h, 0.25), "pos": Vector3(1.8, cy, -3.0), "mat": "wall"})
+	boxes.append({"size": Vector3(1.2, 0.9, 0.25), "pos": Vector3(0, 2.55, -3.0), "mat": "wall"})
+	boxes.append({"size": Vector3(6.4, 0.2, 6.4), "pos": Vector3(0, 3.1, 0), "mat": "roof"})
+	boxes.append({"size": Vector3(1.2, 1.2, 1.2), "pos": Vector3(1.5, 0.6, 1.2), "mat": "trim"})
+	boxes.append({"size": Vector3(1.2, 1.2, 1.2), "pos": Vector3(-1.6, 0.6, 1.8), "mat": "trim"})
+
+	spots.append(Vector3(0.0, 0.0, 0.0))
+	spots.append(Vector3(-2.0, 0.0, 2.2))
+	spots.append(Vector3(2.2, 0.0, -2.0))
+
+
+func _warehouse_boxes(boxes: Array, spots: Array) -> void:
+	var ext := 2.2
+	var total_h := 4.2 + ext
+	var cy := (4.2 - ext) * 0.5
+
+	boxes.append({"size": Vector3(10.0, total_h, 0.3), "pos": Vector3(0, cy, 3.5), "mat": "wall"})
+	boxes.append({"size": Vector3(0.3, total_h, 7.0), "pos": Vector3(-5.0, cy, 0), "mat": "wall"})
+	boxes.append({"size": Vector3(0.3, total_h, 7.0), "pos": Vector3(5.0, cy, 0), "mat": "wall"})
+	boxes.append({"size": Vector3(3.4, total_h, 0.3), "pos": Vector3(-3.3, cy, -3.5), "mat": "wall"})
+	boxes.append({"size": Vector3(3.4, total_h, 0.3), "pos": Vector3(3.3, cy, -3.5), "mat": "wall"})
+	boxes.append({"size": Vector3(3.2, 1.4, 0.3), "pos": Vector3(0, 3.5, -3.5), "mat": "wall"})
+	boxes.append({"size": Vector3(10.4, 0.2, 7.4), "pos": Vector3(0, 4.3, 0), "mat": "roof"})
+	boxes.append({"size": Vector3(2.4, 2.4, 5.0), "pos": Vector3(-2.6, 1.2, 0.5), "mat": "metal"})
+	boxes.append({"size": Vector3(2.4, 2.4, 5.0), "pos": Vector3(2.6, 1.2, 0.5), "mat": "metal"})
+
+	spots.append(Vector3(0.0, 0.0, -2.2))
+	spots.append(Vector3(0.0, 0.0, 2.6))
+	spots.append(Vector3(-3.5, 0.0, 3.0))
+	spots.append(Vector3(3.5, 0.0, -2.0))
+
+
+func _yard_boxes(boxes: Array, spots: Array) -> void:
+	boxes.append({"size": Vector3(2.4, 3.6, 5.5), "pos": Vector3(-3.5, 1.0, -2.0), "mat": "metal"})
+	boxes.append({"size": Vector3(2.4, 3.6, 5.5), "pos": Vector3(0.0, 1.0, 2.5), "mat": "metal"})
+	boxes.append({"size": Vector3(2.4, 3.6, 5.5), "pos": Vector3(3.5, 1.0, -2.0), "mat": "metal"})
+	boxes.append({"size": Vector3(9.0, 2.4, 0.3), "pos": Vector3(0, 0.6, -5.5), "mat": "wall"})
+	boxes.append({"size": Vector3(0.3, 2.4, 9.0), "pos": Vector3(-5.5, 0.6, 0), "mat": "wall"})
+
+	spots.append(Vector3(-3.5, 0.0, 1.5))
+	spots.append(Vector3(0.0, 0.0, -1.0))
+	spots.append(Vector3(3.5, 0.0, 1.5))
+	spots.append(Vector3(0.0, 0.0, 5.0))

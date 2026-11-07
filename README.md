@@ -27,6 +27,7 @@
 - **双武器槽**：最多带 2 把枪，右下角显示 `1 M4 | 2 AWM`，当前槽白色高亮
   - 有空槽时拾取直接放入；两个槽都满时替换当前枪，旧枪掉在脚下（1 秒保护期后才能再捡）
   - 点“切换”或按 Q 换枪，有 0.4 秒切枪时间，期间不能开火/换弹
+- **房区**：3 个 POI（民房 / 仓库 / 集装箱场），墙体屋顶有碰撞、有门可进，内部优先刷武器箱和医疗包；小地图用白色方块标出
 - **安全区**：5 个阶段收缩，圈外每秒掉血并从 2 递增到 16；**每个阶段会随机偏移下一个圈心**，小地图同时显示当前圈和下一个圈
 - **受击方向**：被打时屏幕边缘出现红色弧，指向子弹来源
 - **击杀播报**：右上角滚动 `Bot 05 淘汰 Bot 01`，你击杀时橙色高亮
@@ -81,7 +82,7 @@ scripts/
   bot.gd               索敌、追逐、走位、射击、死亡
   character_visual.gd  方块小人（程序化建模 + 跑步摆臂 + 举枪姿势）
   skins.gd             皮肤配色表
-  world.gd             程序化岛屿（高度场网格 + 水面 + 树 + 石头）
+  world.gd             程序化岛屿（高度场网格 + 水面 + 树 + 石头 + POI 房区）
   zone.gd              缩圈阶段与圈外伤害
   loot.gd              武器箱拾取
   medkit.gd            医疗包拾取
@@ -106,6 +107,7 @@ scripts/
 | 侦察镜时长 / 冷却 / 范围 | `scripts/player.gd` → `SCAN_TIME` / `SCAN_CD`；`scripts/hud.gd` 与 `scripts/minimap.gd` 里的 `110.0` |
 | 缩圈节奏 / 圈外伤害 | `scripts/zone.gd` → `PHASES` |
 | 岛的大小 / 地形精度 | `scripts/world.gd` → `WORLD_SIZE` / `RES` |
+| 房区数量 / 平整度 / 间距 | `scripts/world.gd` → `POI_COUNT` / `_is_flat()` / `80.0` |
 | 移动速度 / 跳跃 / 灵敏度 | `scripts/player.gd` 顶部常量 |
 | 摇杆和按钮位置 | `scripts/touch_controls.gd` → `_layout()` |
 

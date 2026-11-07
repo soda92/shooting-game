@@ -58,7 +58,7 @@ func _process(delta: float) -> void:
 func _spawn_player() -> void:
 	var scene: PackedScene = load("res://scenes/player.tscn")
 	player = scene.instantiate()
-	var p: Vector3 = world.random_land_point(140.0)
+	var p: Vector3 = world.random_open_point(140.0, 26.0)
 	player.position = Vector3(p.x, p.y + 120.0, p.z)
 	player.rotation.y = randf() * TAU
 	add_child(player)
@@ -91,17 +91,29 @@ func _spawn_bots() -> void:
 
 func _spawn_loot() -> void:
 	var scene: PackedScene = load("res://scenes/loot.tscn")
+	var spots: Array = world.loot_spots
 	for i in range(LOOT_COUNT):
 		var l = scene.instantiate()
-		var p: Vector3 = world.random_land_point(165.0)
-		l.position = Vector3(p.x, p.y + 0.9, p.z)
+		var p: Vector3
+		if i < 16 and not spots.is_empty():
+			var s: Vector3 = spots[i % spots.size()]
+			p = Vector3(s.x + randf_range(-1.2, 1.2), 0.0, s.z + randf_range(-1.2, 1.2))
+		else:
+			p = world.random_land_point(165.0)
+		var gy: float = world.height_at(p.x, p.z)
+		l.position = Vector3(p.x, gy + 0.9, p.z)
 		add_child(l)
 		l.setup(Weapons.ORDER[i % Weapons.ORDER.size()])
 
 
 func _spawn_medkits() -> void:
+	var spots: Array = world.loot_spots
 	for i in range(MEDKIT_COUNT):
-		spawn_medkit_at(world.random_land_point(165.0))
+		if i < 4 and not spots.is_empty():
+			var s: Vector3 = spots[(i * 2) % spots.size()]
+			spawn_medkit_at(Vector3(s.x + randf_range(-1.0, 1.0), 0.0, s.z + randf_range(-1.0, 1.0)))
+		else:
+			spawn_medkit_at(world.random_land_point(165.0))
 
 
 func spawn_medkit_at(pos: Vector3) -> void:

@@ -83,6 +83,12 @@ func _draw() -> void:
 		var tc := _to_map(game.zone.target_center())
 		draw_arc(tc, tr * scale, 0.0, TAU, 72, Color(1, 1, 1, 0.45), 1.0)
 
+	# POI markers
+	for c in game.world.poi_centers:
+		var m := _to_map(c)
+		draw_rect(Rect2(m - Vector2(4, 4), Vector2(8, 8)), Color(0.92, 0.92, 0.96, 0.85))
+		draw_rect(Rect2(m - Vector2(4, 4), Vector2(8, 8)), Color(0.1, 0.1, 0.12, 0.9), false, 1.0)
+
 	# loot
 	for n in get_tree().get_nodes_in_group("loot"):
 		if is_instance_valid(n):

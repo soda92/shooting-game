@@ -25,6 +25,8 @@ var _fire_cd := 0.0
 var _wander := Vector3.ZERO
 var _wander_t := 0.0
 var _strafe := 1.0
+var _stuck_t := 0.0
+var _last_pos := Vector3.ZERO
 
 @onready var visual = $Visual
 
@@ -34,6 +36,7 @@ func _ready() -> void:
 	_fire_cd = randf_range(0.2, 1.2)
 	weapon_id = Weapons.ORDER[randi() % Weapons.ORDER.size()]
 	visual.set_skin(Skins.random_bot_skin())
+	_last_pos = global_position
 
 
 func setup(w: Node3D, g: Node) -> void:
@@ -105,6 +108,16 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y = 0.0
 	move_and_slide()
+
+	_stuck_t += delta
+	if _stuck_t >= 0.7:
+		if global_position.distance_to(_last_pos) < 0.4:
+			target = null
+			_retarget = 1.2
+			_strafe = -_strafe
+			_pick_wander()
+		_last_pos = global_position
+		_stuck_t = 0.0
 
 	visual.tick(delta, Vector2(velocity.x, velocity.z).length(), _has_target())
 
