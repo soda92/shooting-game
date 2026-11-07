@@ -1,11 +1,12 @@
 extends Node3D
-## Blocky low-poly character built from primitives, with a code-driven
-## run cycle and a simple aim pose. No external art assets required.
+## Blocky low-poly character with a code-driven run cycle and aim pose.
+## Static body parts are merged into a few meshes to keep draw calls low.
 
-var _body_mat: StandardMaterial3D
-var _dark_mat: StandardMaterial3D
+var _shirt_mat: StandardMaterial3D
+var _vest_mat: StandardMaterial3D
+var _pants_mat: StandardMaterial3D
 var _skin_mat: StandardMaterial3D
-var _base_color := Color(0.20, 0.45, 0.85)
+var _skin: Dictionary = {}
 
 var _arm_l: Node3D
 var _arm_r: Node3D
@@ -17,50 +18,26 @@ var _aim := 0.0
 
 func _ready() -> void:
 	_build()
+	set_skin(Skins.player_skin())
 
 
-func set_primary(c: Color) -> void:
-	_base_color = c
-	if _body_mat != null:
-		_body_mat.albedo_color = c
+func set_skin(skin: Dictionary) -> void:
+	_skin = skin
+	if _shirt_mat == null:
+		return
+	_shirt_mat.albedo_color = skin["shirt"]
+	_vest_mat.albedo_color = skin["vest"]
+	_pants_mat.albedo_color = skin["pants"]
+	_skin_mat.albedo_color = skin["skin"]
 
 
 func flash() -> void:
-	if _body_mat == null:
+	if _shirt_mat == null:
 		return
-	_body_mat.albedo_color = _base_color.lerp(Color(1, 1, 1), 0.85)
+	var base: Color = _skin.get("shirt", Color.WHITE)
+	_shirt_mat.albedo_color = base.lerp(Color.WHITE, 0.8)
 	var tw := create_tween()
-	tw.tween_property(_body_mat, "albedo_color", _base_color, 0.12)
-
-
-func _build() -> void:
-	_body_mat = _mat(_base_color)
-	_dark_mat = _mat(Color(0.13, 0.15, 0.19))
-	_skin_mat = _mat(Color(0.85, 0.70, 0.55))
-
-	# torso + chest rig
-	_box(Vector3(0.46, 0.60, 0.28), Vector3(0, 1.15, 0), _body_mat)
-	_box(Vector3(0.50, 0.12, 0.33), Vector3(0, 1.31, 0), _dark_mat)
-
-	# head + helmet
-	_box(Vector3(0.26, 0.26, 0.26), Vector3(0, 1.60, 0), _skin_mat)
-	_box(Vector3(0.30, 0.10, 0.30), Vector3(0, 1.74, 0), _body_mat)
-
-	# arms (pivot at the shoulder)
-	_arm_l = _pivot(Vector3(-0.31, 1.37, 0))
-	_box(Vector3(0.12, 0.48, 0.12), Vector3(0, -0.24, 0), _body_mat, _arm_l)
-	_arm_r = _pivot(Vector3(0.31, 1.37, 0))
-	_box(Vector3(0.12, 0.48, 0.12), Vector3(0, -0.24, 0), _body_mat, _arm_r)
-
-	# rifle in the right hand
-	_box(Vector3(0.08, 0.52, 0.10), Vector3(0, -0.55, 0), _dark_mat, _arm_r)
-	_box(Vector3(0.13, 0.09, 0.26), Vector3(0, -0.44, -0.13), _dark_mat, _arm_r)
-
-	# legs (pivot at the hip)
-	_leg_l = _pivot(Vector3(-0.13, 0.82, 0))
-	_box(Vector3(0.16, 0.74, 0.18), Vector3(0, -0.37, 0), _dark_mat, _leg_l)
-	_leg_r = _pivot(Vector3(0.13, 0.82, 0))
-	_box(Vector3(0.16, 0.74, 0.18), Vector3(0, -0.37, 0), _dark_mat, _leg_r)
+	tw.tween_property(_shirt_mat, "albedo_color", base, 0.12)
 
 
 func tick(delta: float, speed: float, aiming: bool) -> void:
@@ -88,6 +65,60 @@ func tick(delta: float, speed: float, aiming: bool) -> void:
 
 # --------------------------------------------------------------------------
 
+func _build() -> void:
+	_shirt_mat = _mat(Color(0.16, 0.30, 0.58))
+	_vest_mat = _mat(Color(0.08, 0.10, 0.15))
+	_pants_mat = _mat(Color(0.12, 0.16, 0.24))
+	_skin_mat = _mat(Color(0.86, 0.72, 0.57))
+
+	# torso, helmet, shoulder pads, backpack
+	_merge([
+		{"size": Vector3(0.46, 0.40, 0.28), "pos": Vector3(0, 1.24, 0)},
+		{"size": Vector3(0.40, 0.22, 0.26), "pos": Vector3(0, 0.98, 0)},
+		{"size": Vector3(0.30, 0.10, 0.30), "pos": Vector3(0, 1.74, 0)},
+		{"size": Vector3(0.16, 0.10, 0.21), "pos": Vector3(-0.33, 1.43, 0)},
+		{"size": Vector3(0.16, 0.10, 0.21), "pos": Vector3(0.33, 1.43, 0)},
+		{"size": Vector3(0.34, 0.36, 0.16), "pos": Vector3(0, 1.18, 0.23)},
+	], _shirt_mat)
+
+	# vest, belt, visor
+	_merge([
+		{"size": Vector3(0.50, 0.30, 0.32), "pos": Vector3(0, 1.26, 0)},
+		{"size": Vector3(0.45, 0.07, 0.30), "pos": Vector3(0, 0.88, 0)},
+		{"size": Vector3(0.22, 0.05, 0.02), "pos": Vector3(0, 1.62, -0.14)},
+	], _vest_mat)
+
+	# head
+	_merge([{"size": Vector3(0.26, 0.26, 0.26), "pos": Vector3(0, 1.60, 0)}], _skin_mat)
+
+	# arms: upper arm + glove
+	_arm_l = _pivot(Vector3(-0.31, 1.37, 0))
+	_merge([{"size": Vector3(0.12, 0.42, 0.12), "pos": Vector3(0, -0.21, 0)}], _shirt_mat, _arm_l)
+	_merge([{"size": Vector3(0.13, 0.10, 0.13), "pos": Vector3(0, -0.45, 0)}], _vest_mat, _arm_l)
+
+	_arm_r = _pivot(Vector3(0.31, 1.37, 0))
+	_merge([{"size": Vector3(0.12, 0.42, 0.12), "pos": Vector3(0, -0.21, 0)}], _shirt_mat, _arm_r)
+	_merge([{"size": Vector3(0.13, 0.10, 0.13), "pos": Vector3(0, -0.45, 0)}], _vest_mat, _arm_r)
+
+	# rifle in the right hand
+	_merge([
+		{"size": Vector3(0.08, 0.52, 0.10), "pos": Vector3(0, -0.56, 0)},
+		{"size": Vector3(0.06, 0.30, 0.06), "pos": Vector3(0, -0.74, 0)},
+		{"size": Vector3(0.13, 0.09, 0.26), "pos": Vector3(0, -0.44, -0.13)},
+	], _vest_mat, _arm_r)
+
+	# legs: pants + boot
+	_leg_l = _pivot(Vector3(-0.13, 0.82, 0))
+	_merge([{"size": Vector3(0.16, 0.62, 0.18), "pos": Vector3(0, -0.31, 0)}], _pants_mat, _leg_l)
+	_merge([{"size": Vector3(0.17, 0.14, 0.22), "pos": Vector3(0, -0.68, -0.02)}], _vest_mat, _leg_l)
+
+	_leg_r = _pivot(Vector3(0.13, 0.82, 0))
+	_merge([{"size": Vector3(0.16, 0.62, 0.18), "pos": Vector3(0, -0.31, 0)}], _pants_mat, _leg_r)
+	_merge([{"size": Vector3(0.17, 0.14, 0.22), "pos": Vector3(0, -0.68, -0.02)}], _vest_mat, _leg_r)
+
+
+# --------------------------------------------------------------------------
+
 func _mat(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
@@ -95,13 +126,16 @@ func _mat(c: Color) -> StandardMaterial3D:
 	return m
 
 
-func _box(size: Vector3, pos: Vector3, mat: StandardMaterial3D, parent: Node3D = null) -> MeshInstance3D:
-	var bm := BoxMesh.new()
-	bm.size = size
+func _merge(parts: Array, mat: StandardMaterial3D, parent: Node3D = null) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for p in parts:
+		var bm := BoxMesh.new()
+		bm.size = p["size"]
+		st.append_from(bm, 0, Transform3D(Basis(), p["pos"]))
 	var mi := MeshInstance3D.new()
-	mi.mesh = bm
+	mi.mesh = st.commit()
 	mi.material_override = mat
-	mi.position = pos
 	if parent != null:
 		parent.add_child(mi)
 	else:

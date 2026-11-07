@@ -55,7 +55,7 @@ var _step_t := 0.0
 func _ready() -> void:
 	if not OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	visual.set_primary(Color(0.20, 0.45, 0.85))
+	visual.set_skin(Skins.player_skin())
 	_apply_weapon(weapon_id)
 	spring.rotation.x = pitch
 
@@ -173,7 +173,7 @@ func _process_play(delta: float) -> void:
 		_step_t -= delta
 		if _step_t <= 0.0:
 			_step_t = 0.30 if InputState.sprint else 0.44
-			Sfx.play("footstep", -18.0, randf_range(0.85, 1.15))
+			Sfx.footstep(-18.0)
 
 	var want_jump := InputState.consume_jump()
 	if not is_on_floor():

@@ -143,6 +143,13 @@ func _on_zone_phase(_index: int) -> void:
 	Sfx.play("zone_warn", -8.0)
 
 
+func cycle_player_skin() -> void:
+	var s: Dictionary = Skins.cycle()
+	if player != null and player.visual != null:
+		player.visual.set_skin(s)
+	hud.set_center("皮肤：" + String(s["name"]), 1.0)
+
+
 func _on_bot_died(bot: Node) -> void:
 	if over:
 		return

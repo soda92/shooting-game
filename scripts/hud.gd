@@ -190,6 +190,14 @@ func _build() -> void:
 	_alive_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_place(_alive_label, 1.0, 0.0, 1.0, 0.0, -460, 20, -30, 58)
 
+	var skin_btn := Button.new()
+	skin_btn.text = "换肤"
+	skin_btn.focus_mode = Control.FOCUS_NONE
+	skin_btn.add_theme_font_size_override("font_size", 18)
+	_place(skin_btn, 1.0, 0.0, 1.0, 0.0, -150, 64, -30, 104)
+	skin_btn.pressed.connect(_on_skin_pressed)
+	add_child(skin_btn)
+
 	_zone_label = _make_label("安全区", 22)
 	_zone_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_place(_zone_label, 0.5, 0.0, 0.5, 0.0, -360, 18, 360, 54)
@@ -350,3 +358,8 @@ func _process(delta: float) -> void:
 func _on_restart() -> void:
 	if game != null:
 		game.restart()
+
+
+func _on_skin_pressed() -> void:
+	if game != null:
+		game.cycle_player_skin()

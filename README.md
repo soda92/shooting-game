@@ -67,6 +67,7 @@ scripts/
   player.gd            移动、跳伞、射击、换弹、受伤、死亡
   bot.gd               索敌、追逐、走位、射击、死亡
   character_visual.gd  方块小人（程序化建模 + 跑步摆臂 + 举枪姿势）
+  skins.gd             皮肤配色表
   world.gd             程序化岛屿（高度场网格 + 水面 + 树 + 石头）
   zone.gd              缩圈阶段与圈外伤害
   loot.gd              武器箱拾取
@@ -111,3 +112,25 @@ scripts/
   - `Sfx.play_at("shot_rifle", pos, -7.0)` —— 3D，用于 AI 枪声、死亡，带距离衰减
 - 音量单位是 dB：`0` 最响，`-6` 约一半，`-18` 很轻
 - 短音效用 `.wav`；长音频/背景音乐用 `.ogg`（导入时可勾选循环）
+
+### 混音与细节
+
+- 两条总线：`SFX`（2D）和 `World`（3D）；`World` 上挂了 `AudioEffectReverb`，Master 上挂了 `AudioEffectLimiter`
+- 3D 音效开了距离低通（`attenuation_filter_cutoff_hz = 7000`），远处枪声会变闷
+- 每次播放随机 ±3% 音高、±1 dB 音量，避免机关枪一样的机械重复
+- 脚步有 3 个变体随机切换；另有一条 5 秒风声环境音循环
+- 真实素材的关键是**分层**：击发瞬态（transient）+ 枪身（body）+ 尾音（tail），再叠加距离低通，质感会立刻不一样
+
+### 去哪找素材
+
+- Kenney（CC0，直接商用）：https://kenney.nl/assets?q=audio
+- Freesound（CC0 / CC-BY，注意署名）：https://freesound.org
+- Sonniss GDC 音频包（免费商用）：https://sonniss.com/gameaudiogdc
+
+## 皮肤
+
+`scripts/skins.gd` 是一张配色表，每套包含 `shirt / vest / pants / helmet / skin` 五个颜色。右上角“换肤”按钮会在 6 套之间循环，立即生效，重开也会保留。
+
+- 玩家默认“特战蓝”，AI 从其余 5 套里随机
+- 加皮肤：往 `LIST` 里追加一个字典即可
+- 换真正的模型：把角色换成带骨骼的 glTF，保留 `character_visual.gd` 的 `set_skin()` 和 `tick(delta, speed, aiming)` 接口，`player.gd` / `bot.gd` 不用改

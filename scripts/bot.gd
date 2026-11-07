@@ -30,11 +30,7 @@ var _strafe := 1.0
 func _ready() -> void:
 	_strafe = 1.0 if randf() > 0.5 else -1.0
 	_fire_cd = randf_range(0.2, 1.2)
-	visual.set_primary(Color.from_hsv(
-		randf_range(0.0, 0.12),
-		randf_range(0.55, 0.80),
-		randf_range(0.62, 0.82)
-	))
+	visual.set_skin(Skins.random_bot_skin())
 
 
 func setup(w: Node3D, g: Node) -> void:
