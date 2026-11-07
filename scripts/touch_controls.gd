@@ -14,6 +14,8 @@ var _buttons: Dictionary = {}
 var _btn_touch: Dictionary = {}
 
 var _font: SystemFont
+var _idle := 0.0
+var _ui_alpha := 1.0
 
 
 func _ready() -> void:
@@ -39,15 +41,16 @@ func _layout() -> void:
 	_joy_knob = _joy_origin
 
 	_buttons = {
-		"fire": {"pos": Vector2(s.x * 0.905, s.y * 0.760), "r": m * 0.105, "label": "开火"},
-		"fire_l": {"pos": Vector2(s.x * 0.285, s.y * 0.500), "r": m * 0.078, "label": "开火"},
-		"aim": {"pos": Vector2(s.x * 0.800, s.y * 0.625), "r": m * 0.070, "label": "瞄准"},
-		"jump": {"pos": Vector2(s.x * 0.700, s.y * 0.735), "r": m * 0.060, "label": "跳"},
-		"reload": {"pos": Vector2(s.x * 0.805, s.y * 0.880), "r": m * 0.056, "label": "换弹"},
-		"medkit": {"pos": Vector2(s.x * 0.720, s.y * 0.885), "r": m * 0.052, "label": "医疗"},
-		"scan": {"pos": Vector2(s.x * 0.640, s.y * 0.760), "r": m * 0.050, "label": "侦察"},
-		"view": {"pos": Vector2(s.x * 0.885, s.y * 0.500), "r": m * 0.052, "label": "视角"},
-		"switch": {"pos": Vector2(s.x * 0.580, s.y * 0.905), "r": m * 0.050, "label": "切换"},
+		"fire": {"pos": Vector2(s.x * 0.930, s.y * 0.780), "r": m * 0.090, "label": "开火"},
+		"fire_l": {"pos": Vector2(s.x * 0.280, s.y * 0.550), "r": m * 0.062, "label": "开火"},
+		"aim": {"pos": Vector2(s.x * 0.820, s.y * 0.630), "r": m * 0.060, "label": "瞄准"},
+		"jump": {"pos": Vector2(s.x * 0.735, s.y * 0.720), "r": m * 0.050, "label": "跳"},
+		"reload": {"pos": Vector2(s.x * 0.845, s.y * 0.895), "r": m * 0.047, "label": "换弹"},
+		"medkit": {"pos": Vector2(s.x * 0.755, s.y * 0.895), "r": m * 0.045, "label": "医疗"},
+		"switch": {"pos": Vector2(s.x * 0.665, s.y * 0.895), "r": m * 0.044, "label": "切换"},
+		"scan": {"pos": Vector2(s.x * 0.575, s.y * 0.835), "r": m * 0.044, "label": "侦察"},
+		"view": {"pos": Vector2(s.x * 0.930, s.y * 0.510), "r": m * 0.044, "label": "视角"},
+		"attach": {"pos": Vector2(s.x * 0.760, s.y * 0.470), "r": m * 0.044, "label": "配件"},
 	}
 	queue_redraw()
 
@@ -57,6 +60,7 @@ func _layout() -> void:
 func _input(event: InputEvent) -> void:
 	if InputState.locked:
 		return
+	_idle = 0.0
 	if event is InputEventScreenTouch:
 		_handle_touch(event.position, event.index, event.pressed)
 	elif event is InputEventScreenDrag:
@@ -130,6 +134,9 @@ func _apply(name: String, on: bool) -> void:
 	elif name == "switch":
 		if on:
 			InputState.switch_queued = true
+	elif name == "attach":
+		if on:
+			InputState.attach_toggle_queued = true
 	queue_redraw()
 
 
@@ -139,9 +146,12 @@ func _any_fire_down() -> bool:
 	return int(_btn_touch.get("fire", -1)) != -1 or int(_btn_touch.get("fire_l", -1)) != -1
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if InputState.locked and (_joy_active or _look_index != -1):
 		reset_touches()
+	_idle += delta
+	var target := 1.0 if _idle < 2.5 else 0.35
+	_ui_alpha = lerpf(_ui_alpha, target, 1.0 - exp(-6.0 * delta))
 	queue_redraw()
 
 
@@ -163,12 +173,12 @@ func reset_touches() -> void:
 
 
 func _draw() -> void:
-	# joystick
-	draw_circle(_joy_origin, _joy_r, Color(1, 1, 1, 0.09))
-	draw_arc(_joy_origin, _joy_r, 0.0, TAU, 48, Color(1, 1, 1, 0.26), 2.0)
+	var joy_a := maxf(_ui_alpha, 0.55)
+	draw_circle(_joy_origin, _joy_r, Color(1, 1, 1, 0.09 * joy_a))
+	draw_arc(_joy_origin, _joy_r, 0.0, TAU, 48, Color(1, 1, 1, 0.26 * joy_a), 2.0)
 	var knob := _joy_knob if _joy_active else _joy_origin
-	draw_circle(knob, _joy_r * 0.36, Color(1, 1, 1, 0.20))
-	draw_arc(knob, _joy_r * 0.36, 0.0, TAU, 32, Color(1, 1, 1, 0.34), 2.0)
+	draw_circle(knob, _joy_r * 0.36, Color(1, 1, 1, 0.20 * joy_a))
+	draw_arc(knob, _joy_r * 0.36, 0.0, TAU, 32, Color(1, 1, 1, 0.34 * joy_a), 2.0)
 
 	# buttons
 	for name in _buttons:
@@ -176,6 +186,8 @@ func _draw() -> void:
 		var p: Vector2 = b["pos"]
 		var r: float = b["r"]
 		var pressed := int(_btn_touch.get(name, -1)) != -1
+		var a := 1.0 if pressed else _ui_alpha
+
 		var dim := false
 		var txt: String = b["label"]
 		if name == "medkit" and InputState.medkit_count <= 0:
@@ -184,16 +196,16 @@ func _draw() -> void:
 			dim = true
 			txt = "%d" % int(ceil(InputState.scan_cd))
 
-		var fill := Color(1.0, 0.55, 0.25, 0.38) if pressed else Color(1, 1, 1, 0.10)
+		var fill := Color(1.0, 0.55, 0.25, 0.38 * a) if pressed else Color(1, 1, 1, 0.10 * a)
 		if dim:
-			fill = Color(1, 1, 1, 0.05)
+			fill = Color(1, 1, 1, 0.05 * a)
 		if name == "view" and InputState.first_person and not pressed:
-			fill = Color(0.35, 0.70, 1.0, 0.35)
+			fill = Color(0.35, 0.70, 1.0, 0.35 * a)
 		draw_circle(p, r, fill)
-		draw_arc(p, r, 0.0, TAU, 44, Color(1, 1, 1, 0.30), 2.0)
+		draw_arc(p, r, 0.0, TAU, 44, Color(1, 1, 1, 0.30 * a), 2.0)
 
 		var fs := int(r * 0.46)
-		var fcol := Color(1, 1, 1, 0.92) if not dim else Color(1, 1, 1, 0.40)
+		var fcol := Color(1, 1, 1, 0.92 * a) if not dim else Color(1, 1, 1, 0.40 * a)
 		var ts := _font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
 		draw_string(_font, p - Vector2(ts.x * 0.5, -ts.y * 0.30), txt,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, fs, fcol)

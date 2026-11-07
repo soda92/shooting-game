@@ -20,6 +20,7 @@ var touch_sprint := false
 var medkit_queued := false
 var scan_queued := false
 var switch_queued := false
+var attach_toggle_queued := false
 var first_person := false
 
 # mirrored from the player for UI display
@@ -138,6 +139,12 @@ func consume_switch() -> bool:
 	return v
 
 
+func consume_attach() -> bool:
+	var v := attach_toggle_queued
+	attach_toggle_queued = false
+	return v
+
+
 func clear() -> void:
 	move = Vector2.ZERO
 	touch_move = Vector2.ZERO
@@ -150,3 +157,4 @@ func clear() -> void:
 	medkit_queued = false
 	scan_queued = false
 	switch_queued = false
+	attach_toggle_queued = false

@@ -8,6 +8,7 @@ signal hit_confirmed(headshot: bool)
 signal weapon_changed(id: String)
 signal healed(amount: float)
 signal scan_started
+signal scope_added(id: String)
 
 enum State { DROP, PLAY, DEAD }
 
@@ -32,6 +33,7 @@ var max_health := 100.0
 var slots: Array = []
 var active := 0
 var switching := 0.0
+var scopes_owned := {"red_dot": false, "4x": false, "8x": false}
 var medkits := 0
 var scan_t := 0.0
 var scan_cd := 0.0
@@ -88,10 +90,12 @@ func _process(delta: float) -> void:
 
 	var target_fov := 72.0
 	if ads:
+		var sdef := Scopes.get_def(current_scope())
+		var sfov := float(sdef["fov"])
 		if fp:
-			target_fov = 30.0 if weapon_id() == "sniper" else 46.0
+			target_fov = sfov
 		else:
-			target_fov = 38.0 if weapon_id() == "sniper" else 50.0
+			target_fov = lerpf(72.0, sfov, 0.55)
 	_fov = lerpf(_fov, target_fov, 1.0 - exp(-9.0 * delta))
 	cam.fov = _fov
 
@@ -394,7 +398,7 @@ func _finish_reload() -> void:
 
 func _make_slot(id: String) -> Dictionary:
 	var def := Weapons.get_def(id)
-	return {"id": id, "mag": int(def["mag"]), "reserve": int(def["reserve"])}
+	return {"id": id, "mag": int(def["mag"]), "reserve": int(def["reserve"]), "scope": "iron"}
 
 
 func weapon_id() -> String:
@@ -413,6 +417,30 @@ func reserve() -> int:
 	if slots.is_empty() or slots[active].is_empty():
 		return 0
 	return int(slots[active]["reserve"])
+
+
+func current_scope() -> String:
+	if slots.is_empty() or slots[active].is_empty():
+		return "iron"
+	return String(slots[active].get("scope", "iron"))
+
+
+func add_scope(id: String) -> void:
+	if not scopes_owned.has(id):
+		return
+	scopes_owned[id] = true
+	Sfx.play("pickup", -4.0)
+	scope_added.emit(id)
+
+
+func equip_scope(id: String) -> bool:
+	if not Scopes.LIST.has(id):
+		return false
+	if id != "iron" and not bool(scopes_owned.get(id, false)):
+		return false
+	slots[active]["scope"] = id
+	Sfx.play("reload", -10.0, 1.4)
+	return true
 
 
 func give_weapon(id: String) -> void:

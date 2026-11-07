@@ -1,0 +1,48 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/scope_pickup.gd" id="1_scope"]
+
+[sub_resource type="BoxShape3D" id="pickup_shape"]
+size = Vector3(1.1, 1.1, 1.1)
+
+[sub_resource type="BoxMesh" id="body_mesh"]
+size = Vector3(0.36, 0.30, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="body_mat"]
+albedo_color = Color(0.12, 0.13, 0.16, 1)
+roughness = 0.6
+metallic = 0.3
+
+[sub_resource type="BoxMesh" id="lens_mesh"]
+size = Vector3(0.30, 0.10, 0.30)
+
+[sub_resource type="StandardMaterial3D" id="lens_mat"]
+albedo_color = Color(0.35, 0.85, 1.0, 1)
+emission_enabled = true
+emission = Color(0.20, 0.75, 1.0, 1)
+emission_energy_multiplier = 1.2
+
+[node name="ScopePickup" type="Area3D" groups=["scope"]]
+script = ExtResource("1_scope")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+shape = SubResource("pickup_shape")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+mesh = SubResource("body_mesh")
+material_override = SubResource("body_mat")
+
+[node name="Lens" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18, 0)
+mesh = SubResource("lens_mesh")
+material_override = SubResource("lens_mat")
+
+[node name="Label" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, 0)
+billboard = 1
+no_depth_test = true
+font_size = 96
+pixel_size = 0.0025
+outline_size = 14
+modulate = Color(0.65, 0.92, 1, 1)
+text = "RD"

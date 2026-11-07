@@ -4,7 +4,10 @@ extends Node3D
 const BOT_COUNT := 11
 const LOOT_COUNT := 26
 const MEDKIT_COUNT := 10
+const SCOPE_COUNT := 6
 const MEDKIT_SCENE := preload("res://scenes/medkit.tscn")
+const SCOPE_SCENE := preload("res://scenes/scope.tscn")
+const SCOPE_IDS := ["red_dot", "4x", "8x"]
 
 @onready var world = $World
 @onready var zone = $Zone
@@ -34,6 +37,7 @@ func _ready() -> void:
 	_spawn_bots()
 	_spawn_loot()
 	_spawn_medkits()
+	_spawn_scopes()
 
 	hud.setup(self)
 	hud.set_center("从空中选择落点", 2.5)
@@ -70,6 +74,7 @@ func _spawn_player() -> void:
 	player.weapon_changed.connect(_on_weapon_changed)
 	player.healed.connect(_on_player_healed)
 	player.scan_started.connect(_on_scan_started)
+	player.scope_added.connect(_on_scope_added)
 
 
 func _spawn_bots() -> void:
@@ -121,6 +126,25 @@ func spawn_medkit_at(pos: Vector3) -> void:
 	var y: float = world.height_at(pos.x, pos.z)
 	m.position = Vector3(pos.x, y + 0.7, pos.z)
 	add_child(m)
+
+
+func _spawn_scopes() -> void:
+	var spots: Array = world.loot_spots
+	for i in range(SCOPE_COUNT):
+		var p: Vector3
+		if not spots.is_empty():
+			var s: Vector3 = spots[(i * 3) % spots.size()]
+			p = Vector3(s.x + randf_range(-1.5, 1.5), 0.0, s.z + randf_range(-1.5, 1.5))
+		else:
+			p = world.random_land_point(165.0)
+		var sc = SCOPE_SCENE.instantiate()
+		sc.position = Vector3(p.x, world.height_at(p.x, p.z) + 0.6, p.z)
+		add_child(sc)
+		sc.setup(SCOPE_IDS[i % SCOPE_IDS.size()])
+
+
+func _on_scope_added(id: String) -> void:
+	hud.set_center("拾取 " + String(Scopes.get_def(id)["name"]), 1.0)
 
 
 func drop_weapon_at(id: String, pos: Vector3) -> void:

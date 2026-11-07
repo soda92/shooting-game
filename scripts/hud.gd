@@ -89,18 +89,26 @@ class Scope extends Control:
 		if alpha <= 0.01 or game == null or game.player == null:
 			return
 
-		var sniper: bool = String(game.player.weapon_id()) == "sniper"
+		var sid := String(game.player.current_scope())
+		var overlay := String(Scopes.get_def(sid)["overlay"])
+		var full := overlay == "scope"
 		var c := size * 0.5
-		var inner: float = minf(size.x, size.y) * (0.31 if sniper else 0.40)
+		var inner: float
+		if full:
+			inner = minf(size.x, size.y) * (0.25 if sid == "8x" else 0.31)
+		elif overlay == "red_dot":
+			inner = minf(size.x, size.y) * 0.42
+		else:
+			inner = minf(size.x, size.y) * 0.46
 		var outer: float = size.length() * 0.5 + 24.0
-		var shade := 0.96 if sniper else 0.32
+		var shade := 0.96 if full else (0.16 if overlay == "red_dot" else 0.10)
 
 		# dark ring outside the sight
 		draw_arc(c, (inner + outer) * 0.5, 0.0, TAU, 160,
 			Color(0, 0, 0, alpha * shade), outer - inner)
 		draw_arc(c, inner, 0.0, TAU, 128, Color(0, 0, 0, alpha * 0.75), 3.0)
 
-		if sniper:
+		if full:
 			var col := Color(0.02, 0.02, 0.02, alpha)
 			draw_line(c + Vector2(-inner, 0), c + Vector2(-16, 0), col, 2.0)
 			draw_line(c + Vector2(inner, 0), c + Vector2(16, 0), col, 2.0)
@@ -113,9 +121,13 @@ class Scope extends Control:
 				draw_circle(c + Vector2(0, -off), 1.4, col)
 				draw_circle(c + Vector2(0, off), 1.4, col)
 			draw_circle(c, 2.2, Color(0.90, 0.10, 0.10, alpha))
+		elif overlay == "red_dot":
+			draw_arc(c, inner * 0.55, 0.0, TAU, 96, Color(0, 0, 0, alpha * 0.5), 2.0)
+			draw_circle(c, 3.0, Color(1.0, 0.15, 0.10, alpha))
 		else:
-			draw_arc(c, inner * 0.72, 0.0, TAU, 96, Color(0, 0, 0, alpha * 0.55), 2.0)
-			draw_circle(c, 2.0, Color(1.0, 0.28, 0.22, alpha))
+			draw_line(c + Vector2(0, -inner * 0.35), c + Vector2(0, -7),
+				Color(0, 0, 0, alpha * 0.8), 3.0)
+			draw_circle(c, 2.2, Color(1, 1, 1, alpha * 0.85))
 
 
 class DamageDir extends Control:
@@ -169,6 +181,9 @@ var _dmg_dir
 var _feed_label: RichTextLabel
 var _feed: Array = []
 var _feed_dirty := false
+var _attach_root: Control
+var _attach_title: Label
+var _attach_buttons: Dictionary = {}
 var _end_root: Control
 var _end_title: Label
 var _end_sub: Label
@@ -377,6 +392,60 @@ func _build() -> void:
 	btn.pressed.connect(_on_restart)
 	_end_root.add_child(btn)
 
+	# Attachment panel
+	_attach_root = Control.new()
+	_attach_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_attach_root.mouse_filter = Control.MOUSE_FILTER_STOP
+	_attach_root.visible = false
+	add_child(_attach_root)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.62)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_attach_root.add_child(dim)
+
+	var panel := PanelContainer.new()
+	_place(panel, 0.5, 0.5, 0.5, 0.5, -300, -230, 300, 230)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.07, 0.09, 0.12, 0.97)
+	sb.border_color = Color(0.35, 0.55, 0.75, 0.85)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(6)
+	panel.add_theme_stylebox_override("panel", sb)
+	_attach_root.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	_attach_title = Label.new()
+	_attach_title.add_theme_font_size_override("font_size", 24)
+	vbox.add_child(_attach_title)
+
+	for id in Scopes.ORDER:
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(520, 46)
+		b.add_theme_font_size_override("font_size", 20)
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(_on_scope_pick.bind(String(id)))
+		vbox.add_child(b)
+		_attach_buttons[id] = b
+
+	var close := Button.new()
+	close.text = "关闭"
+	close.custom_minimum_size = Vector2(520, 44)
+	close.add_theme_font_size_override("font_size", 20)
+	close.focus_mode = Control.FOCUS_NONE
+	close.pressed.connect(_close_attach)
+	vbox.add_child(close)
+
 
 # --------------------------------------------------------------------------
 # Public API
@@ -391,7 +460,11 @@ func update_hud() -> void:
 	_hp_fill.color = Color(0.90, 0.25, 0.20) if hpr < 0.35 else Color(0.30, 0.85, 0.42)
 	_hp_label.text = "%d HP" % int(ceil(p.health))
 	_med_label.text = "医疗包 x%d" % p.medkits
-	_ammo_label.text = "%d / %d\n%s" % [p.mag(), p.reserve(), String(Weapons.get_def(p.weapon_id())["label"])]
+	_ammo_label.text = "%d / %d\n%s · %s" % [
+		p.mag(), p.reserve(),
+		String(Weapons.get_def(p.weapon_id())["label"]),
+		String(Scopes.get_def(p.current_scope())["short"])
+	]
 	_slots_label.text = _slot_text(p)
 	_alive_label.text = "存活 %d  ·  击杀 %d" % [game.alive, game.kills]
 	_zone_label.text = game.zone.status_text()
@@ -472,6 +545,12 @@ func _process(delta: float) -> void:
 	if _reticle != null:
 		_reticle.visible = not (InputState.aim and InputState.first_person)
 
+	if InputState.consume_attach():
+		_toggle_attach()
+	if _attach_root.visible:
+		if game == null or game.over or game.player == null or not game.player.is_alive():
+			_close_attach()
+
 	if _center_t > 0.0:
 		_center_t -= delta
 		if _center_t <= 0.0:
@@ -514,6 +593,52 @@ func _process(delta: float) -> void:
 func _on_restart() -> void:
 	if game != null:
 		game.restart()
+
+
+func _toggle_attach() -> void:
+	if game == null or game.player == null:
+		return
+	if _attach_root.visible:
+		_close_attach()
+		return
+	if game.over or not game.player.is_alive():
+		return
+	_refresh_attach()
+	_attach_root.visible = true
+	InputState.locked = true
+
+
+func _close_attach() -> void:
+	_attach_root.visible = false
+	if game != null and not game.over:
+		InputState.locked = false
+
+
+func _on_scope_pick(id: String) -> void:
+	if game == null or game.player == null:
+		return
+	if game.player.equip_scope(id):
+		_refresh_attach()
+		update_hud()
+
+
+func _refresh_attach() -> void:
+	var p = game.player
+	var wname := String(Weapons.get_def(p.weapon_id())["label"])
+	var sname := String(Scopes.get_def(p.current_scope())["short"])
+	_attach_title.text = "配件 · %s · 当前 %s" % [wname, sname]
+	for id in Scopes.ORDER:
+		var sid := String(id)
+		var owned: bool = sid == "iron" or bool(p.scopes_owned.get(sid, false))
+		var equipped: bool = String(p.current_scope()) == sid
+		var txt := String(Scopes.get_def(sid)["name"])
+		if equipped:
+			txt += "（已装备）"
+		elif not owned:
+			txt += "（未拾取）"
+		var b: Button = _attach_buttons[sid]
+		b.text = txt
+		b.disabled = not owned
 
 
 func _on_skin_pressed() -> void:

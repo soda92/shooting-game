@@ -96,6 +96,9 @@ func _draw() -> void:
 	for n in get_tree().get_nodes_in_group("medkit"):
 		if is_instance_valid(n):
 			draw_circle(_to_map(n.global_position), 2.6, Color(0.35, 1.0, 0.55, 0.95))
+	for n in get_tree().get_nodes_in_group("scope"):
+		if is_instance_valid(n):
+			draw_circle(_to_map(n.global_position), 2.2, Color(0.72, 0.45, 1.0, 0.95))
 
 	# enemies highlighted by the recon lens
 	if game.player.scan_t > 0.0:
