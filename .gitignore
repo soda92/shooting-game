@@ -31,3 +31,10 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Godot
+.godot/
+build/
+*.apk
+*.idsig
+export_credentials.cfg
