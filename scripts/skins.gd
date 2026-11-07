@@ -77,6 +77,12 @@ static var LIST := [
 		"skin": Color(0.96, 0.82, 0.74),
 		"eye": Color(0.90, 0.30, 0.50),
 	},
+	{
+		"name": "二次元·樱",
+		"style": "model",
+		"model": "res://assets/models/anime_pink.glb",
+		"model_yaw": PI,
+	},
 ]
 
 
@@ -84,7 +90,9 @@ static var LIST := [
 ## Add your own path here after dropping a .glb into assets/models/.
 ## Example:
 ##   "res://assets/models/my_anime_skin.glb",
-const MODEL_MANIFEST := []
+const MODEL_MANIFEST := [
+	"res://assets/models/anime_pink.glb",
+]
 
 
 static func player_skin() -> Dictionary:

@@ -35,6 +35,23 @@
 - 跑动时按速度调整动画播放倍率
 - 没有动画的模型会保持 T-pose
 
+## 内置的二次元模型
+
+仓库里已经带了一个自己生成的二次元角色 `assets/models/anime_pink.glb`：
+
+- 由 `tools/make_anime_skin.py` 在 Blender 5.2 里程序化生成
+- 大头、粉色双马尾、白衬衫、短裙、过膝袜、手枪
+- 带骨骼和 `Idle` / `Run` / `Aim` 三个动画
+- 游戏里显示为「二次元·樱」
+
+重新生成或改样式：
+
+```bash
+blender -b -P tools/make_anime_skin.py
+```
+
+颜色、发型、服装尺寸都在脚本里，改完重新跑一次会覆盖 GLB。
+
 ## 二次元模型来源
 
 1. **VRoid Studio**（免费）捏人 → 导出 `.vrm`
