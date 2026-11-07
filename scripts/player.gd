@@ -4,7 +4,7 @@ extends CharacterBody3D
 signal died
 signal landed
 signal damaged(amount: float)
-signal hit_confirmed
+signal hit_confirmed(headshot: bool)
 signal weapon_changed(id: String)
 signal healed(amount: float)
 signal scan_started
@@ -37,6 +37,8 @@ var scan_t := 0.0
 var scan_cd := 0.0
 
 var pitch := -0.10
+var hit_from_dir := Vector3.ZERO
+var hit_from_t := 0.0
 var _fire_cd := 0.0
 var _reload_t := 0.0
 var _reloading := false
@@ -106,6 +108,7 @@ func _process(delta: float) -> void:
 	scan_cd = maxf(0.0, scan_cd - delta)
 	_hurt_cd = maxf(0.0, _hurt_cd - delta)
 	switching = maxf(0.0, switching - delta)
+	hit_from_t = maxf(0.0, hit_from_t - delta)
 	InputState.medkit_count = medkits
 	InputState.scan_cd = scan_cd
 
@@ -217,6 +220,7 @@ func _shoot() -> void:
 	slots[active]["mag"] = mag() - 1
 	Sfx.play("shot_" + id, -2.0, randf_range(0.95, 1.06))
 	_fire_cd = Weapons.shot_interval(id)
+	_muzzle_flash()
 
 	var spray := deg_to_rad(float(def["spread_deg"]))
 	var origin := cam.global_position
@@ -224,6 +228,8 @@ func _shoot() -> void:
 	var fwd := -basis.z
 	var pellets := int(def["pellets"])
 	var base_dir := _aim_assist(origin, fwd)
+	var any_hit := false
+	var any_head := false
 
 	for i in range(pellets):
 		var dir := (base_dir + basis.x * randf_range(-spray, spray) + basis.y * randf_range(-spray, spray)).normalized()
@@ -234,10 +240,24 @@ func _shoot() -> void:
 			to = hit["position"]
 			var c: Object = hit["collider"]
 			if c != null and c.has_method("take_damage"):
-				c.take_damage(float(def["damage"]), self)
-				hit_confirmed.emit()
+				var dmg := float(def["damage"])
+				var is_head := false
+				if c.has_method("is_alive"):
+					var head_y: float = c.global_position.y + 1.45
+					if float(hit["position"].y) >= head_y:
+						dmg *= 2.0
+						is_head = true
+				c.take_damage(dmg, self)
+				any_hit = true
+				if is_head:
+					any_head = true
+			if i < 4:
+				_impact(hit["position"], hit.get("normal", Vector3.UP))
 		if pellets == 1 or i < 4:
 			_spawn_tracer(muzzle.global_position, to)
+
+	if any_hit:
+		hit_confirmed.emit(any_head)
 
 	# small recoil kick
 	pitch = clampf(pitch + deg_to_rad(0.35), -0.95, 0.55)
@@ -291,6 +311,65 @@ func _spawn_tracer(from: Vector3, to: Vector3) -> void:
 	mi.global_position = (from + to) * 0.5
 	mi.look_at(to, Vector3.UP)
 	get_tree().create_timer(0.05).timeout.connect(mi.queue_free)
+
+
+func _muzzle_flash() -> void:
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.5, 0.5)
+
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(1.0, 0.88, 0.45, 0.95)
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.no_depth_test = true
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = quad
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	get_tree().current_scene.add_child(mi)
+	mi.global_position = muzzle.global_position + (-cam.global_basis.z) * 0.15
+	mi.scale = Vector3.ONE * randf_range(0.8, 1.3)
+
+	var tw := create_tween()
+	tw.tween_property(mi, "scale", Vector3.ONE * 0.05, 0.06)
+	get_tree().create_timer(0.08).timeout.connect(
+		func() -> void:
+			if is_instance_valid(mi):
+				mi.queue_free()
+	)
+
+
+func _impact(pos: Vector3, normal: Vector3) -> void:
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.07
+	sphere.height = 0.14
+	sphere.radial_segments = 5
+	sphere.rings = 2
+
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.85, 0.80, 0.66, 0.9)
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = sphere
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	get_tree().current_scene.add_child(mi)
+	mi.global_position = pos + normal * 0.06
+
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(mi, "scale", Vector3.ONE * 2.2, 0.16)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.16)
+	get_tree().create_timer(0.2).timeout.connect(
+		func() -> void:
+			if is_instance_valid(mi):
+				mi.queue_free()
+	)
 
 
 func _start_reload() -> void:
@@ -402,9 +481,12 @@ func _activate_scan() -> void:
 	scan_started.emit()
 
 
-func take_damage(amount: float, _attacker: Node = null) -> void:
+func take_damage(amount: float, attacker: Node = null) -> void:
 	if state == State.DEAD:
 		return
+	if attacker != null and is_instance_valid(attacker):
+		hit_from_dir = (attacker.global_position - global_position).normalized()
+		hit_from_t = 1.0
 	health = maxf(0.0, health - amount)
 	if _hurt_cd <= 0.0:
 		_hurt_cd = 0.14

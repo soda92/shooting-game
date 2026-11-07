@@ -3,12 +3,14 @@ extends Control
 
 class Reticle extends Control:
 	var hit_t := 0.0
+	var head := false
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	func flash() -> void:
-		hit_t = 0.2
+	func flash(is_head := false) -> void:
+		hit_t = 0.22
+		head = is_head
 
 	func _process(delta: float) -> void:
 		if hit_t > 0.0:
@@ -24,12 +26,13 @@ class Reticle extends Control:
 		draw_line(c + Vector2(8, 0), c + Vector2(16, 0), col, 2.0)
 		draw_circle(c, 1.8, col)
 		if hit_t > 0.0:
-			var a := clampf(hit_t / 0.2, 0.0, 1.0)
-			var hc := Color(1.0, 0.4, 0.3, a)
-			draw_line(c + Vector2(-13, -13), c + Vector2(-5, -5), hc, 3.0)
-			draw_line(c + Vector2(13, -13), c + Vector2(5, -5), hc, 3.0)
-			draw_line(c + Vector2(-13, 13), c + Vector2(-5, 5), hc, 3.0)
-			draw_line(c + Vector2(13, 13), c + Vector2(5, 5), hc, 3.0)
+			var a := clampf(hit_t / 0.22, 0.0, 1.0)
+			var hc := Color(1.0, 0.68, 0.18, a) if head else Color(1.0, 0.4, 0.3, a)
+			var s := 17.0 if head else 13.0
+			draw_line(c + Vector2(-s, -s), c + Vector2(-5, -5), hc, 3.0)
+			draw_line(c + Vector2(s, -s), c + Vector2(5, -5), hc, 3.0)
+			draw_line(c + Vector2(-s, s), c + Vector2(-5, 5), hc, 3.0)
+			draw_line(c + Vector2(s, s), c + Vector2(5, 5), hc, 3.0)
 
 
 class Markers extends Control:
@@ -115,6 +118,34 @@ class Scope extends Control:
 			draw_circle(c, 2.0, Color(1.0, 0.28, 0.22, alpha))
 
 
+class DamageDir extends Control:
+	var game
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if game == null or game.player == null:
+			return
+		var p = game.player
+		if p.hit_from_t <= 0.0:
+			return
+
+		var cam: Camera3D = p.get_node("Pivot/SpringArm/Camera")
+		var local: Vector3 = cam.global_transform.basis.inverse() * p.hit_from_dir
+		var ang := atan2(local.x, -local.z)
+		var c := size * 0.5
+		var radius: float = minf(size.x, size.y) * 0.33
+		var a: float = clampf(p.hit_from_t, 0.0, 1.0)
+		var mid := ang - PI * 0.5
+
+		draw_arc(c, radius, mid - 0.16, mid + 0.16, 12, Color(1.0, 0.15, 0.10, a * 0.85), 12.0)
+		draw_arc(c, radius + 10.0, mid - 0.12, mid + 0.12, 12, Color(1.0, 0.15, 0.10, a * 0.35), 6.0)
+
+
 var game
 
 var _hp_bg: ColorRect
@@ -134,6 +165,10 @@ var _reticle
 var _minimap
 var _markers
 var _scope
+var _dmg_dir
+var _feed_label: RichTextLabel
+var _feed: Array = []
+var _feed_dirty := false
 var _end_root: Control
 var _end_title: Label
 var _end_sub: Label
@@ -160,6 +195,7 @@ func setup(g: Node) -> void:
 	_markers.game = g
 	_markers.font = theme.default_font
 	_scope.game = g
+	_dmg_dir.game = g
 
 
 # --------------------------------------------------------------------------
@@ -286,6 +322,19 @@ func _build() -> void:
 	add_child(_scope)
 	_scope.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
+	_dmg_dir = DamageDir.new()
+	add_child(_dmg_dir)
+	_dmg_dir.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	_feed_label = RichTextLabel.new()
+	_feed_label.bbcode_enabled = true
+	_feed_label.fit_content = true
+	_feed_label.scroll_active = false
+	_feed_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_feed_label.add_theme_font_size_override("normal_font_size", 18)
+	_place(_feed_label, 1.0, 0.0, 1.0, 0.0, -640, 112, -30, 300)
+	add_child(_feed_label)
+
 	_kill_label = _make_label("击杀 +1", 34)
 	_kill_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_kill_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.35))
@@ -369,9 +418,18 @@ func _slot_text(p) -> String:
 	return "[right]" + "     ".join(parts) + "[/right]"
 
 
-func flash_hit() -> void:
+func flash_hit(headshot := false) -> void:
 	if _reticle != null:
-		_reticle.flash()
+		_reticle.flash(headshot)
+
+
+func add_feed(killer: String, victim: String, by_player: bool) -> void:
+	var kc := "#ffb066" if by_player else "#cfd8e3"
+	var line := "[color=%s]%s[/color]  淘汰  %s" % [kc, killer, victim]
+	_feed.push_front({"text": line, "t": 4.0})
+	if _feed.size() > 4:
+		_feed.resize(4)
+	_feed_dirty = true
 
 
 func flash_damage(_amount: float) -> void:
@@ -435,6 +493,22 @@ func _process(delta: float) -> void:
 		_kill_label.modulate.a = clampf(_kill_t / 0.35, 0.0, 1.0)
 		if _kill_t <= 0.0:
 			_kill_label.visible = false
+
+	if not _feed.is_empty():
+		var removed := false
+		for e in _feed:
+			e["t"] = float(e["t"]) - delta
+		while not _feed.is_empty() and float(_feed[_feed.size() - 1]["t"]) <= 0.0:
+			_feed.pop_back()
+			removed = true
+		if removed:
+			_feed_dirty = true
+	if _feed_dirty:
+		_feed_dirty = false
+		var lines: Array[String] = []
+		for e in _feed:
+			lines.append(String(e["text"]))
+		_feed_label.text = "[right]" + "\n".join(lines) + "[/right]"
 
 
 func _on_restart() -> void:

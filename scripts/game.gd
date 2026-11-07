@@ -81,6 +81,7 @@ func _spawn_bots() -> void:
 			p = world.random_land_point(165.0)
 		b.position = Vector3(p.x, p.y + 2.0, p.z)
 		b.rotation.y = randf() * TAU
+		b.bot_name = "Bot %02d" % (i + 1)
 		add_child(b)
 		b.setup(world, self)
 		b.died.connect(_on_bot_died)
@@ -131,9 +132,9 @@ func _on_player_damaged(amount: float) -> void:
 	hud.flash_damage(amount)
 
 
-func _on_hit_confirmed() -> void:
-	Sfx.play("hit", -6.0, randf_range(0.95, 1.05))
-	hud.flash_hit()
+func _on_hit_confirmed(headshot: bool) -> void:
+	Sfx.play("hit", -6.0, 1.35 if headshot else randf_range(0.95, 1.05))
+	hud.flash_hit(headshot)
 
 
 func _on_weapon_changed(id: String) -> void:
@@ -162,10 +163,24 @@ func cycle_player_skin() -> void:
 func _on_bot_died(bot: Node) -> void:
 	if over:
 		return
-	if is_instance_valid(bot) and bot.last_attacker == player:
+
+	var killer := "毒圈"
+	var by_player := false
+	if is_instance_valid(bot) and is_instance_valid(bot.last_attacker):
+		if bot.last_attacker == player:
+			killer = "你"
+			by_player = true
+		elif bot.last_attacker.has_method("get_display_name"):
+			killer = bot.last_attacker.get_display_name()
+
+	var victim: String = bot.bot_name if is_instance_valid(bot) else "Bot"
+	hud.add_feed(killer, victim, by_player)
+
+	if by_player:
 		kills += 1
 		Sfx.play("kill", -3.0)
 		hud.flash_kill()
+
 	alive = maxi(0, alive - 1)
 	if alive <= 1 and player != null and player.is_alive():
 		_win()

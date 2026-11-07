@@ -22,6 +22,8 @@ var _shrink_t := 0.0
 var _from_r := 215.0
 var _to_r := 215.0
 var _shrink_dur := 1.0
+var _from_center := Vector3.ZERO
+var _to_center := Vector3.ZERO
 
 @onready var wall: MeshInstance3D = $Wall
 
@@ -33,7 +35,21 @@ func reset(start_radius: float) -> void:
 	shrinking = false
 	_timer = float(PHASES[0]["wait"])
 	dps = 0.0
+	_from_center = center
+	_to_center = center
+	_prepare_next()
 	_update_wall()
+
+
+func _prepare_next() -> void:
+	if _phase >= PHASES.size():
+		return
+	var ph: Dictionary = PHASES[_phase]
+	_to_r = float(ph["to"])
+	var max_off := maxf(0.0, radius - _to_r)
+	var ang := randf() * TAU
+	var off := randf() * max_off * 0.9
+	_to_center = center + Vector3(cos(ang) * off, 0.0, sin(ang) * off)
 
 
 func _process(delta: float) -> void:
@@ -48,7 +64,7 @@ func _process(delta: float) -> void:
 			shrinking = true
 			_shrink_t = 0.0
 			_from_r = radius
-			_to_r = float(ph["to"])
+			_from_center = center
 			_shrink_dur = float(ph["time"])
 			dps = float(ph["dps"])
 			phase_changed.emit(_phase)
@@ -56,11 +72,15 @@ func _process(delta: float) -> void:
 		_shrink_t += delta
 		var t := clampf(_shrink_t / _shrink_dur, 0.0, 1.0)
 		radius = lerpf(_from_r, _to_r, t)
+		center = _from_center.lerp(_to_center, t)
 		if t >= 1.0:
 			shrinking = false
+			center = _to_center
+			radius = _to_r
 			_phase += 1
 			if _phase < PHASES.size():
 				_timer = float(PHASES[_phase]["wait"])
+				_prepare_next()
 	_update_wall()
 
 
@@ -94,6 +114,8 @@ func is_inside(pos: Vector3) -> bool:
 func target_radius() -> float:
 	if _phase >= PHASES.size():
 		return 0.0
-	if shrinking:
-		return _to_r
-	return float(PHASES[_phase]["to"])
+	return _to_r
+
+
+func target_center() -> Vector3:
+	return _to_center

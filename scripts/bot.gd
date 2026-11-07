@@ -8,10 +8,12 @@ const GRAVITY := 20.0
 const SPEED := 4.4
 const DAMAGE := 8.0
 const FIRE_INTERVAL := 0.85
-const RANGE := 55.0
+const RANGE := 42.0
 
 var world
 var game
+var bot_name := "Bot"
+var weapon_id := "rifle"
 var health := 100.0
 var max_health := 100.0
 var alive := true
@@ -30,6 +32,7 @@ var _strafe := 1.0
 func _ready() -> void:
 	_strafe = 1.0 if randf() > 0.5 else -1.0
 	_fire_cd = randf_range(0.2, 1.2)
+	weapon_id = Weapons.ORDER[randi() % Weapons.ORDER.size()]
 	visual.set_skin(Skins.random_bot_skin())
 
 
@@ -69,7 +72,6 @@ func _physics_process(delta: float) -> void:
 		if dist < RANGE and _can_see(target):
 			_fire_cd -= delta
 			if _fire_cd <= 0.0:
-				_fire_cd = FIRE_INTERVAL * randf_range(0.75, 1.3)
 				_shoot(target)
 	else:
 		_wander_t -= delta
@@ -84,6 +86,17 @@ func _physics_process(delta: float) -> void:
 	if world != null and world.height_at(global_position.x, global_position.z) < 0.0:
 		var back := -Vector3(global_position.x, 0.0, global_position.z).normalized()
 		desired += back * 1.5
+
+	# Rotate toward the safe zone instead of dying outside it.
+	if game != null and game.zone != null:
+		var zone = game.zone
+		var flat := Vector2(global_position.x - zone.center.x, global_position.z - zone.center.z)
+		var near_edge: bool = flat.length() > zone.radius - 15.0
+		if not zone.is_inside(global_position) or (zone.shrinking and near_edge):
+			var to_c := Vector3(zone.center.x - global_position.x, 0.0, zone.center.z - global_position.z)
+			if to_c.length() > 0.5:
+				desired = to_c.normalized()
+				rotation.y = lerp_angle(rotation.y, atan2(-desired.x, -desired.z), 6.0 * delta)
 
 	velocity.x = desired.x * SPEED
 	velocity.z = desired.z * SPEED
@@ -137,23 +150,44 @@ func _pick_wander() -> void:
 
 
 func _shoot(t: Node3D) -> void:
+	var def := Weapons.get_def(weapon_id)
+	_fire_cd = clampf(60.0 / float(def["rpm"]) * randf_range(1.8, 3.0), 0.5, 1.6)
+
 	var from := global_position + Vector3(0.0, 1.5, 0.0)
 	var aim := t.global_position + Vector3(0.0, 1.0, 0.0)
 	var dir := (aim - from).normalized()
-	var spread := 0.045
+	var spread := deg_to_rad(float(def["spread_deg"])) * 1.4 + 0.02
 	dir = (dir + Vector3(randf_range(-spread, spread), randf_range(-spread, spread), randf_range(-spread, spread))).normalized()
 
-	var to := from + dir * RANGE
+	var max_range := minf(RANGE, float(def["range"]))
+	var to := from + dir * max_range
 	var params := PhysicsRayQueryParameters3D.create(from, to, 1, [get_rid()])
 	var hit := get_world_3d().direct_space_state.intersect_ray(params)
 	if not hit.is_empty():
 		to = hit["position"]
 		var c: Object = hit["collider"]
 		if c != null and c.has_method("take_damage"):
-			c.take_damage(DAMAGE * randf_range(0.8, 1.2), self)
+			var dmg := float(def["damage"])
+			if weapon_id == "shotgun":
+				dmg = 16.0
+			elif weapon_id == "sniper":
+				dmg = 42.0
+			if c.has_method("is_alive") and float(hit["position"].y) >= c.global_position.y + 1.45:
+				dmg *= 1.8
+			c.take_damage(dmg * randf_range(0.85, 1.15), self)
 
-	Sfx.play_at("shot_rifle", global_position, -7.0, randf_range(0.9, 1.1))
+	Sfx.play_at("shot_" + weapon_id, global_position, -7.0, randf_range(0.9, 1.1))
 	_spawn_tracer(from, to)
+
+
+func give_weapon(id: String) -> void:
+	if not Weapons.DEFS.has(id):
+		return
+	weapon_id = id
+
+
+func get_display_name() -> String:
+	return bot_name
 
 
 func _spawn_tracer(from: Vector3, to: Vector3) -> void:

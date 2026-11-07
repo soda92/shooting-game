@@ -80,7 +80,8 @@ func _draw() -> void:
 	draw_arc(zc, game.zone.radius * scale, 0.0, TAU, 72, Color(0.45, 0.90, 1.0, 0.95), 2.0)
 	var tr: float = game.zone.target_radius()
 	if tr > 0.0 and tr < game.zone.radius:
-		draw_arc(zc, tr * scale, 0.0, TAU, 72, Color(1, 1, 1, 0.45), 1.0)
+		var tc := _to_map(game.zone.target_center())
+		draw_arc(tc, tr * scale, 0.0, TAU, 72, Color(1, 1, 1, 0.45), 1.0)
 
 	# loot
 	for n in get_tree().get_nodes_in_group("loot"):
