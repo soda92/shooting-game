@@ -48,6 +48,7 @@ var _step_t := 0.0
 
 @onready var spring: SpringArm3D = $Pivot/SpringArm
 @onready var cam: Camera3D = $Pivot/SpringArm/Camera
+@onready var pivot: Node3D = $Pivot
 @onready var muzzle: Marker3D = $Muzzle
 @onready var visual = $Visual
 
@@ -74,8 +75,9 @@ func is_alive() -> bool:
 func _process(delta: float) -> void:
 	var look := InputState.consume_look()
 	if state == State.PLAY and not InputState.locked:
-		rotate_y(-look.x * LOOK_SENS)
-		pitch = clampf(pitch - look.y * LOOK_SENS, -0.95, 0.55)
+		var sens := LOOK_SENS * (0.55 if InputState.aim else 1.0)
+		rotate_y(-look.x * sens)
+		pitch = clampf(pitch - look.y * sens, -0.95, 0.55)
 		spring.rotation.x = pitch
 
 	var target_fov := 72.0
@@ -83,6 +85,17 @@ func _process(delta: float) -> void:
 		target_fov = 30.0 if weapon_id == "sniper" else 50.0
 	_fov = lerpf(_fov, target_fov, 1.0 - exp(-9.0 * delta))
 	cam.fov = _fov
+
+	# Sniper ADS switches to a first-person view; other weapons just tighten
+	# the over-the-shoulder camera.
+	var scoped := InputState.aim and weapon_id == "sniper" and state == State.PLAY
+	var ads := InputState.aim and state == State.PLAY
+	var follow := 1.0 - exp(-16.0 * delta)
+	var arm_target := 0.45 if scoped else (3.0 if ads else 4.2)
+	var side_target := 0.0 if scoped else (0.80 if ads else 0.55)
+	spring.spring_length = lerpf(spring.spring_length, arm_target, follow)
+	pivot.position.x = lerpf(pivot.position.x, side_target, follow)
+	visual.visible = not scoped
 
 	scan_t = maxf(0.0, scan_t - delta)
 	scan_cd = maxf(0.0, scan_cd - delta)
@@ -347,6 +360,7 @@ func take_damage(amount: float, _attacker: Node = null) -> void:
 func _die() -> void:
 	state = State.DEAD
 	collision_layer = 0
+	visual.visible = true
 	InputState.locked = true
 	InputState.clear()
 	Sfx.play("death", -2.0)

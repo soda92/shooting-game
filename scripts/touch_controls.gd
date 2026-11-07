@@ -40,6 +40,7 @@ func _layout() -> void:
 
 	_buttons = {
 		"fire": {"pos": Vector2(s.x * 0.905, s.y * 0.760), "r": m * 0.105, "label": "开火"},
+		"fire_l": {"pos": Vector2(s.x * 0.285, s.y * 0.500), "r": m * 0.078, "label": "开火"},
 		"aim": {"pos": Vector2(s.x * 0.800, s.y * 0.625), "r": m * 0.070, "label": "瞄准"},
 		"jump": {"pos": Vector2(s.x * 0.700, s.y * 0.735), "r": m * 0.060, "label": "跳"},
 		"reload": {"pos": Vector2(s.x * 0.805, s.y * 0.880), "r": m * 0.056, "label": "换弹"},
@@ -105,8 +106,8 @@ func _handle_drag(pos: Vector2, idx: int, rel: Vector2) -> void:
 
 
 func _apply(name: String, on: bool) -> void:
-	if name == "fire":
-		InputState.touch_fire = on
+	if name == "fire" or name == "fire_l":
+		InputState.touch_fire = _any_fire_down()
 	elif name == "aim":
 		InputState.touch_aim = on
 	elif name == "jump":
@@ -125,6 +126,10 @@ func _apply(name: String, on: bool) -> void:
 
 
 # --------------------------------------------------------------------------
+
+func _any_fire_down() -> bool:
+	return int(_btn_touch.get("fire", -1)) != -1 or int(_btn_touch.get("fire_l", -1)) != -1
+
 
 func _process(_delta: float) -> void:
 	if InputState.locked and (_joy_active or _look_index != -1):

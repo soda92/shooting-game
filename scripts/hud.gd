@@ -68,6 +68,53 @@ class Markers extends Control:
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 16, col)
 
 
+class Scope extends Control:
+	var game
+	var alpha := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(delta: float) -> void:
+		var want := 0.0
+		if game != null and game.player != null and game.player.is_alive() and InputState.aim:
+			want = 1.0
+		alpha = lerpf(alpha, want, 1.0 - exp(-16.0 * delta))
+		queue_redraw()
+
+	func _draw() -> void:
+		if alpha <= 0.01 or game == null or game.player == null:
+			return
+
+		var sniper: bool = String(game.player.weapon_id) == "sniper"
+		var c := size * 0.5
+		var inner: float = minf(size.x, size.y) * (0.31 if sniper else 0.40)
+		var outer: float = size.length() * 0.5 + 24.0
+		var shade := 0.96 if sniper else 0.32
+
+		# dark ring outside the sight
+		draw_arc(c, (inner + outer) * 0.5, 0.0, TAU, 160,
+			Color(0, 0, 0, alpha * shade), outer - inner)
+		draw_arc(c, inner, 0.0, TAU, 128, Color(0, 0, 0, alpha * 0.75), 3.0)
+
+		if sniper:
+			var col := Color(0.02, 0.02, 0.02, alpha)
+			draw_line(c + Vector2(-inner, 0), c + Vector2(-16, 0), col, 2.0)
+			draw_line(c + Vector2(inner, 0), c + Vector2(16, 0), col, 2.0)
+			draw_line(c + Vector2(0, -inner), c + Vector2(0, -16), col, 2.0)
+			draw_line(c + Vector2(0, inner), c + Vector2(0, 16), col, 2.0)
+			for i in range(1, 5):
+				var off := inner * 0.18 * i
+				draw_circle(c + Vector2(-off, 0), 1.4, col)
+				draw_circle(c + Vector2(off, 0), 1.4, col)
+				draw_circle(c + Vector2(0, -off), 1.4, col)
+				draw_circle(c + Vector2(0, off), 1.4, col)
+			draw_circle(c, 2.2, Color(0.90, 0.10, 0.10, alpha))
+		else:
+			draw_arc(c, inner * 0.72, 0.0, TAU, 96, Color(0, 0, 0, alpha * 0.55), 2.0)
+			draw_circle(c, 2.0, Color(1.0, 0.28, 0.22, alpha))
+
+
 var game
 
 var _hp_bg: ColorRect
@@ -85,6 +132,7 @@ var _kill_label: Label
 var _reticle
 var _minimap
 var _markers
+var _scope
 var _end_root: Control
 var _end_title: Label
 var _end_sub: Label
@@ -110,6 +158,7 @@ func setup(g: Node) -> void:
 	_minimap.setup(g)
 	_markers.game = g
 	_markers.font = theme.default_font
+	_scope.game = g
 
 
 # --------------------------------------------------------------------------
@@ -223,6 +272,10 @@ func _build() -> void:
 	add_child(_markers)
 	_markers.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
+	_scope = Scope.new()
+	add_child(_scope)
+	_scope.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
 	_kill_label = _make_label("击杀 +1", 34)
 	_kill_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_kill_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.35))
@@ -332,6 +385,9 @@ func show_end(win: bool, kills: int, place: int) -> void:
 # --------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if _reticle != null:
+		_reticle.visible = not InputState.aim
+
 	if _center_t > 0.0:
 		_center_t -= delta
 		if _center_t <= 0.0:
