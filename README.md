@@ -129,8 +129,33 @@ scripts/
 
 ## 皮肤
 
-`scripts/skins.gd` 是一张配色表，每套包含 `shirt / vest / pants / helmet / skin` 五个颜色。右上角“换肤”按钮会在 6 套之间循环，立即生效，重开也会保留。
+`scripts/skins.gd` 是一张配色表，每套包含 `shirt / vest / pants / helmet / skin`（士兵）或 `hair / blouse / skirt / socks / shoe / eye`（二次元）颜色。右上角“换肤”按钮会在所有皮肤之间循环，立即生效，重开也会保留。
 
-- 玩家默认“特战蓝”，AI 从其余 5 套里随机
-- 加皮肤：往 `LIST` 里追加一个字典即可
-- 换真正的模型：把角色换成带骨骼的 glTF，保留 `character_visual.gd` 的 `set_skin()` 和 `tick(delta, speed, aiming)` 接口，`player.gd` / `bot.gd` 不用改
+- 6 套士兵配色 + 2 套程序化二次元（樱粉 / 赛博青，大头、双马尾、裙子、过膝袜）
+- 玩家默认“特战蓝”，AI 只从士兵配色里随机
+- 加配色皮肤：往 `LIST` 里追加一个字典即可
+
+### 真模型皮肤（GLB / GLTF）
+
+`character_visual.gd` 支持直接加载带骨骼的模型：
+
+1. 把 `.glb`（或 `.gltf` + 贴图）放进 `assets/models/`
+2. 在 `scripts/skins.gd` 的 `MODEL_MANIFEST` 里加上路径（导出包必须显式列出来，目录扫描只在编辑器里有效）
+3. 重开游戏，右上角“换肤”会多出一个以文件名命名的皮肤
+
+加载器会自动：
+
+- 按 AABB 缩放到 1.75m 并贴地
+- 默认朝 Godot 的 -Z；反了就加 `"model_yaw": 3.14159`
+- 找模型里的 `AnimationPlayer`，按名字匹配 `idle` / `run` / `walk` / `aim`，跑动时按速度调播放倍率
+- 没有动画的模型会保持 T-pose
+
+**二次元模型来源：**
+
+- VRoid Studio（免费）捏人 → 导出 `.vrm`
+- VRM 转 GLB：Blender + VRM Add-on 导出 glTF，或 `vrm2glb`
+- VRM 的 MToon 材质 Godot 不认，会退化成 PBR，颜色容易偏灰；在 Blender 里转成 Principled BSDF 再导出会好很多
+- 动画：Mixamo 下载 idle/run，Blender 里 Retarget 到 VRM 骨架，再一起导出 GLB
+- **不要把你没有分发权的模型提交到仓库**
+
+> 这条通道已用 Mixamo 的 `Soldier.glb` 实测：自动缩放、贴地、朝向、Idle 动画都正常，55–57 FPS。

@@ -22,6 +22,7 @@ var place := 1
 
 func _ready() -> void:
 	randomize()
+	Skins.refresh_models()
 	sun.rotation = Vector3(deg_to_rad(-52.0), deg_to_rad(38.0), 0.0)
 	InputState.locked = false
 	InputState.clear()
