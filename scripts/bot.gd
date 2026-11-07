@@ -9,6 +9,7 @@ const SPEED := 4.4
 const DAMAGE := 8.0
 const FIRE_INTERVAL := 0.85
 const RANGE := 42.0
+const SIGHT_RANGE := 60.0
 
 var world
 var game
@@ -27,8 +28,12 @@ var _wander_t := 0.0
 var _strafe := 1.0
 var _stuck_t := 0.0
 var _last_pos := Vector3.ZERO
+var _alert := false
+var _alert_t := 0.0
+var _alert_vis := 0.0
 
 @onready var visual = $Visual
+@onready var alert_label: Label3D = $Alert
 
 
 func _ready() -> void:
@@ -46,6 +51,10 @@ func setup(w: Node3D, g: Node) -> void:
 
 func is_alive() -> bool:
 	return alive and health > 0.0
+
+
+func can_be_targeted() -> bool:
+	return alive
 
 
 func _physics_process(delta: float) -> void:
@@ -72,10 +81,17 @@ func _physics_process(delta: float) -> void:
 			else:
 				desired = dir.rotated(Vector3.UP, _strafe * PI * 0.5) * 0.75
 
-		if dist < RANGE and _can_see(target):
-			_fire_cd -= delta
-			if _fire_cd <= 0.0:
-				_shoot(target)
+		if _alert:
+			_alert_t -= delta
+			if _alert_t <= 0.0:
+				_alert = false
+		elif dist < RANGE and _can_see(target):
+			var facing := -global_transform.basis.z
+			var flat_dir := to.normalized()
+			if facing.dot(flat_dir) > 0.955:
+				_fire_cd -= delta
+				if _fire_cd <= 0.0:
+					_shoot(target)
 	else:
 		_wander_t -= delta
 		if _wander_t <= 0.0 or global_position.distance_to(_wander) < 3.0:
@@ -121,11 +137,21 @@ func _physics_process(delta: float) -> void:
 
 	visual.tick(delta, Vector2(velocity.x, velocity.z).length(), _has_target())
 
+	if alert_label.visible:
+		_alert_vis -= delta
+		alert_label.modulate.a = clampf(_alert_vis / 0.3, 0.0, 1.0)
+		if _alert_vis <= 0.0:
+			alert_label.visible = false
+
 
 # --------------------------------------------------------------------------
 
 func _has_target() -> bool:
-	return is_instance_valid(target) and target.has_method("is_alive") and target.is_alive()
+	if not is_instance_valid(target) or not target.has_method("is_alive") or not target.is_alive():
+		return false
+	if target.has_method("can_be_targeted") and not target.can_be_targeted():
+		return false
+	return true
 
 
 func _pick_target() -> void:
@@ -136,11 +162,27 @@ func _pick_target() -> void:
 			continue
 		if not n.has_method("is_alive") or not n.is_alive():
 			continue
+		if n.has_method("can_be_targeted") and not n.can_be_targeted():
+			continue
 		var d := global_position.distance_to(n.global_position)
-		if d < best_d and d < 95.0 and _can_see(n):
+		if d < best_d and d < SIGHT_RANGE and _can_see(n):
 			best = n
 			best_d = d
-	target = best
+
+	if best != target:
+		target = best
+		if best != null:
+			_alert_t = randf_range(0.45, 1.0)
+			_alert = true
+			_show_alert()
+		else:
+			_alert = false
+
+
+func _show_alert() -> void:
+	_alert_vis = 1.0
+	alert_label.visible = true
+	alert_label.modulate.a = 1.0
 
 
 func _can_see(t: Node3D) -> bool:

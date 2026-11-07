@@ -9,6 +9,7 @@
 | 医疗包数量 | `scripts/game.gd` → `MEDKIT_COUNT` |
 | 瞄具数量 | `scripts/game.gd` → `SCOPE_COUNT` |
 | 玩家出生避开房区的距离 | `scripts/game.gd` → `random_open_point(140.0, 26.0)` |
+| 降落伞样式 | `scripts/parachutes.gd` → `LIST`（按皮肤索引选择） |
 
 ## 武器与瞄具
 
@@ -19,6 +20,9 @@
 | 瞄具 FOV / 镜圈类型 | `scripts/scopes.gd` → `fov` / `overlay` |
 | 开镜灵敏度 | `scripts/player.gd` → `0.55` |
 | AI 交战距离 | `scripts/bot.gd` → `RANGE`（默认 42） |
+| AI 视野距离 | `scripts/bot.gd` → `SIGHT_RANGE`（默认 60） |
+| AI 反应时间 | `scripts/bot.gd` → `_pick_target()` 里的 `0.45, 1.0` |
+| AI 转向开火阈值 | `scripts/bot.gd` → `facing.dot(flat_dir) > 0.955` |
 | AI 武器池 | `scripts/bot.gd` → `Weapons.ORDER` |
 | AI 射击间隔 | `scripts/bot.gd` → `_shoot()` 里的 `1.8, 3.0` 倍率 |
 

@@ -16,3 +16,14 @@ shape = SubResource("body_shape")
 
 [node name="Visual" type="Node3D" parent="."]
 script = ExtResource("2_visual")
+
+[node name="Alert" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
+billboard = 1
+no_depth_test = true
+font_size = 96
+pixel_size = 0.003
+outline_size = 14
+modulate = Color(1, 0.82, 0.25, 1)
+text = "!"
+visible = false

@@ -49,18 +49,21 @@ var _fov := 72.0
 var _tracer_mat: StandardMaterial3D
 var _hurt_cd := 0.0
 var _step_t := 0.0
+var _chute_open := false
 
 @onready var spring: SpringArm3D = $Pivot/SpringArm
 @onready var cam: Camera3D = $Pivot/SpringArm/Camera
 @onready var pivot: Node3D = $Pivot
 @onready var muzzle: Marker3D = $Muzzle
 @onready var visual = $Visual
+@onready var parachute = $Parachute
 
 
 func _ready() -> void:
 	if not OS.has_feature("mobile"):
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	visual.set_skin(Skins.player_skin())
+	parachute.set_style(Parachutes.LIST[Skins.selected_index % Parachutes.LIST.size()])
 	slots = [_make_slot("rifle"), {}]
 	active = 0
 	spring.rotation.x = pitch
@@ -73,6 +76,10 @@ func setup(w: Node3D, g: Node) -> void:
 
 func is_alive() -> bool:
 	return state != State.DEAD and health > 0.0
+
+
+func can_be_targeted() -> bool:
+	return state == State.PLAY and health > 0.0
 
 
 # --------------------------------------------------------------------------
@@ -162,6 +169,15 @@ func _process_drop(delta: float) -> void:
 	_drop_t += delta
 	velocity.y = -24.0 if _drop_t < FREE_FALL_TIME else -7.0
 
+	if _drop_t >= FREE_FALL_TIME:
+		if not _chute_open:
+			_chute_open = true
+			parachute.open()
+			Sfx.play("pickup", -10.0, 0.6)
+	elif _chute_open:
+		_chute_open = false
+		parachute.close()
+
 	var input := InputState.move
 	var dir := global_transform.basis.x * input.x + global_transform.basis.z * -input.y
 	dir.y = 0.0
@@ -175,6 +191,8 @@ func _process_drop(delta: float) -> void:
 		global_position.y = maxf(ground, global_position.y)
 		velocity = Vector3.ZERO
 		state = State.PLAY
+		_chute_open = false
+		parachute.close()
 		landed.emit()
 
 
