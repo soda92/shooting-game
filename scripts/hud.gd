@@ -388,6 +388,14 @@ func _build() -> void:
 	add_child(_minimap)
 	_place(_minimap, 0.0, 0.0, 0.0, 0.0, 18, 18, 228, 228)
 
+	# Transparent hit area over the minimap; a Button is reliable on touch.
+	var map_hit := Button.new()
+	map_hit.flat = true
+	map_hit.focus_mode = Control.FOCUS_NONE
+	_place(map_hit, 0.0, 0.0, 0.0, 0.0, 18, 18, 228, 228)
+	map_hit.pressed.connect(_open_map)
+	add_child(map_hit)
+
 	var map_btn := Button.new()
 	map_btn.text = "地图"
 	map_btn.focus_mode = Control.FOCUS_NONE
