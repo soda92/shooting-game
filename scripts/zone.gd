@@ -15,6 +15,7 @@ var center := Vector3.ZERO
 var radius := 215.0
 var dps := 2.0
 var shrinking := false
+var training := false
 
 var _phase := 0
 var _timer := 35.0
@@ -53,6 +54,8 @@ func _prepare_next() -> void:
 
 
 func _process(delta: float) -> void:
+	if training:
+		return
 	if _phase >= PHASES.size():
 		return
 
@@ -85,6 +88,10 @@ func _process(delta: float) -> void:
 
 
 func _update_wall() -> void:
+	if training:
+		wall.visible = false
+		return
+	wall.visible = true
 	wall.scale = Vector3(maxf(radius, 0.5), 140.0, maxf(radius, 0.5))
 	wall.position = Vector3(center.x, 70.0, center.z)
 
@@ -96,6 +103,8 @@ func time_left() -> float:
 
 
 func status_text() -> String:
+	if training:
+		return "训练场"
 	if _phase >= PHASES.size():
 		return "安全区已消失"
 	var t := int(ceil(time_left()))
@@ -112,6 +121,8 @@ func is_inside(pos: Vector3) -> bool:
 
 
 func target_radius() -> float:
+	if training:
+		return 0.0
 	if _phase >= PHASES.size():
 		return 0.0
 	return _to_r

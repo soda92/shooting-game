@@ -5,6 +5,8 @@
 | 想改什么 | 位置 |
 |---|---|
 | AI 数量 | `scripts/game.gd` → `BOT_COUNT` |
+| AI 难度倍率 | `scripts/meta.gd` → `bot_*_scale()` |
+| 训练场靶子数量 / 血量 | `scripts/game.gd` → `_spawn_targets()`；`scripts/target.gd` → `max_health` |
 | 武器箱数量 | `scripts/game.gd` → `LOOT_COUNT` |
 | 医疗包数量 | `scripts/game.gd` → `MEDKIT_COUNT` |
 | 瞄具数量 | `scripts/game.gd` → `SCOPE_COUNT` |

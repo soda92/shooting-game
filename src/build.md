@@ -47,7 +47,7 @@ adb shell monkey -p com.soda.islandroyale -c android.intent.category.LAUNCHER 1
 godot --path .
 ```
 
-桌面端会自动捕获鼠标，WASD 移动、鼠标转视角、左键开火、右键瞄准、空格跳、R 换弹、H 医疗、F 侦察、Q 切枪、V 切视角。
+启动后先进入开始界面，选择模式/难度/皮肤后点「开始」进入对局。桌面端会自动捕获鼠标，WASD 移动、鼠标转视角、左键开火、右键瞄准、空格跳、R 换弹、H 医疗、F 侦察、Q 切枪、G 手雷、V 切视角。
 
 ## 构建文档
 

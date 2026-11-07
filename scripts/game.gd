@@ -12,6 +12,7 @@ const SCOPE_SCENE := preload("res://scenes/scope.tscn")
 const ARMOR_SCENE := preload("res://scenes/armor.tscn")
 const GRENADE_PICKUP_SCENE := preload("res://scenes/grenade_pickup.tscn")
 const SCOPE_IDS := ["red_dot", "4x", "8x"]
+const TARGET_SCENE := preload("res://scenes/target.tscn")
 
 @onready var world = $World
 @onready var zone = $Zone
@@ -26,6 +27,12 @@ var kills := 0
 var over := false
 var place := 1
 
+var range_mode := false
+var target_hits := 0
+var spectating := false
+var spectate_target: Node3D = null
+var spec_cam: Camera3D = null
+
 
 func _ready() -> void:
 	randomize()
@@ -34,23 +41,44 @@ func _ready() -> void:
 	InputState.locked = false
 	InputState.clear()
 
-	zone.reset(215.0)
+	range_mode = Meta.mode == "range"
+	if range_mode:
+		zone.training = range_mode
+		zone.reset(999.0)
+		zone.get_node("Wall").visible = false
+		zone.visible = false
+	else:
+		zone.reset(215.0)
 	zone.phase_changed.connect(_on_zone_phase)
 
 	_spawn_player()
-	_spawn_bots()
-	_spawn_loot()
-	_spawn_medkits()
-	_spawn_scopes()
-	_spawn_armor()
-	_spawn_grenades()
+	if range_mode:
+		alive = 1
+		_spawn_range_gear()
+		_spawn_targets()
+	else:
+		_spawn_bots()
+		_spawn_loot()
+		_spawn_medkits()
+		_spawn_scopes()
+		_spawn_armor()
+		_spawn_grenades()
 
 	hud.setup(self)
-	hud.set_center("从空中选择落点", 2.5)
+	hud.set_center("训练场：打靶 / 无限弹药" if range_mode else "从空中选择落点", 2.5)
 
 
 func _process(delta: float) -> void:
+	if spectating:
+		_update_spectator(delta)
+		hud.update_hud()
+		return
+
 	if over:
+		return
+
+	if range_mode:
+		hud.update_hud()
 		return
 
 	if zone.dps > 0.0:
@@ -81,6 +109,10 @@ func _spawn_player() -> void:
 	player.healed.connect(_on_player_healed)
 	player.scan_started.connect(_on_scan_started)
 	player.scope_added.connect(_on_scope_added)
+
+	if range_mode:
+		player.infinite_ammo = true
+		player.spawn_ready(Vector3(p.x, p.y + 1.0, p.z), randf() * TAU)
 
 
 func _spawn_bots() -> void:
@@ -174,6 +206,129 @@ func _spawn_grenades() -> void:
 		var g = GRENADE_PICKUP_SCENE.instantiate()
 		g.position = Vector3(p.x, world.height_at(p.x, p.z) + 0.6, p.z)
 		add_child(g)
+
+
+# --------------------------------------------------------------------------
+# Training range
+# --------------------------------------------------------------------------
+
+func _spawn_range_gear() -> void:
+	var fwd: Vector3 = -player.global_transform.basis.z
+	var right: Vector3 = player.global_transform.basis.x
+	var base: Vector3 = player.global_position
+
+	var ids := ["rifle", "smg", "shotgun", "sniper"]
+	for i in range(4):
+		var pos: Vector3 = base + right * 5.0 + fwd * (1.0 + i * 1.7)
+		var l = load("res://scenes/loot.tscn").instantiate()
+		l.position = Vector3(pos.x, base.y + 0.9, pos.z)
+		add_child(l)
+		l.setup(ids[i])
+
+	for i in range(3):
+		var pos: Vector3 = base - right * 5.0 + fwd * (1.0 + i * 1.7)
+		var s = SCOPE_SCENE.instantiate()
+		s.position = Vector3(pos.x, base.y + 0.6, pos.z)
+		add_child(s)
+		s.setup(SCOPE_IDS[i])
+
+	var ap: Vector3 = base + right * 7.5 + fwd * 2.0
+	var a = ARMOR_SCENE.instantiate()
+	a.position = Vector3(ap.x, base.y + 0.6, ap.z)
+	add_child(a)
+
+	for i in range(2):
+		var gp: Vector3 = base - right * 7.5 + fwd * (2.0 + i * 1.5)
+		var g = GRENADE_PICKUP_SCENE.instantiate()
+		g.position = Vector3(gp.x, base.y + 0.6, gp.z)
+		add_child(g)
+
+	spawn_medkit_at(base - right * 7.5 + fwd * 5.0)
+
+
+func _spawn_targets() -> void:
+	var fwd: Vector3 = -player.global_transform.basis.z
+	var right: Vector3 = player.global_transform.basis.x
+	var base: Vector3 = player.global_position
+
+	for i in range(7):
+		var pos: Vector3 = base + fwd * (5.0 + (i % 2) * 2.0) + right * ((i - 3) * 2.4 + 0.55)
+		var t = TARGET_SCENE.instantiate()
+		t.position = Vector3(pos.x, base.y, pos.z)
+		add_child(t)
+		t.setup(self)
+		var to_player: Vector3 = base - pos
+		to_player.y = 0.0
+		t.rotation.y = atan2(-to_player.x, -to_player.z)
+
+
+# --------------------------------------------------------------------------
+# Spectator
+# --------------------------------------------------------------------------
+
+func start_spectate() -> void:
+	if not over:
+		return
+	var cand: Node3D = null
+	if is_instance_valid(player) and is_instance_valid(player.last_attacker):
+		var k = player.last_attacker
+		if k is Node3D and k.has_method("is_alive") and k.is_alive():
+			cand = k
+	if cand == null:
+		cand = _first_alive_bot()
+	if cand == null:
+		return
+
+	spectate_target = cand
+	if spec_cam == null:
+		spec_cam = Camera3D.new()
+		spec_cam.fov = 70.0
+		add_child(spec_cam)
+	spec_cam.current = true
+	spectating = true
+	hud.show_spectate(String(spectate_target.get_display_name()))
+
+
+func next_spectate() -> void:
+	if not spectating:
+		return
+	var alive_list: Array = []
+	for b in bots:
+		if is_instance_valid(b) and b.is_alive():
+			alive_list.append(b)
+	if alive_list.is_empty():
+		return
+	var idx := alive_list.find(spectate_target)
+	spectate_target = alive_list[(idx + 1) % alive_list.size()]
+	hud.set_spectate_name(String(spectate_target.get_display_name()))
+
+
+func _first_alive_bot() -> Node3D:
+	for b in bots:
+		if is_instance_valid(b) and b.is_alive():
+			return b
+	return null
+
+
+func _update_spectator(delta: float) -> void:
+	if not is_instance_valid(spectate_target) or not spectate_target.is_alive():
+		spectate_target = _first_alive_bot()
+		if spectate_target == null:
+			spectating = false
+			if spec_cam != null:
+				spec_cam.current = false
+			hud.show_end(false, kills, place)
+			return
+		hud.set_spectate_name(String(spectate_target.get_display_name()))
+
+	var t: Vector3 = spectate_target.global_position
+	var back: Vector3 = -spectate_target.global_transform.basis.z
+	var want: Vector3 = t - back * 5.5 + Vector3(0, 2.8, 0)
+	if spec_cam.global_position.length() < 0.01:
+		spec_cam.global_position = want
+	else:
+		spec_cam.global_position = spec_cam.global_position.lerp(want, 1.0 - exp(-8.0 * delta))
+	spec_cam.look_at(t + Vector3(0, 1.2, 0), Vector3.UP)
 
 
 func drop_weapon_at(id: String, pos: Vector3) -> void:

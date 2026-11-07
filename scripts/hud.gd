@@ -187,6 +187,9 @@ var _attach_root: Control
 var _attach_title: Label
 var _attach_buttons: Dictionary = {}
 var _settings_root: Control
+var _spec_root: Control
+var _spec_label: Label
+var _spec_btn: Button
 var _sens_slider: HSlider
 var _vol_slider: HSlider
 var _sens_value: Label
@@ -404,11 +407,21 @@ func _build() -> void:
 	_place(_end_sub, 0.0, 0.45, 1.0, 0.53, 0, 0, 0, 0)
 	_end_root.add_child(_end_sub)
 
+	_spec_btn = Button.new()
+	_spec_btn.text = "观战击杀者"
+	_spec_btn.add_theme_font_size_override("font_size", 26)
+	_spec_btn.custom_minimum_size = Vector2(280, 76)
+	_spec_btn.focus_mode = Control.FOCUS_NONE
+	_place(_spec_btn, 0.5, 0.60, 0.5, 0.60, -300, 0, -20, 76)
+	_spec_btn.pressed.connect(_on_spectate)
+	_end_root.add_child(_spec_btn)
+
 	var btn := Button.new()
 	btn.text = "再来一局"
-	btn.add_theme_font_size_override("font_size", 28)
+	btn.add_theme_font_size_override("font_size", 26)
 	btn.custom_minimum_size = Vector2(280, 76)
-	_place(btn, 0.5, 0.60, 0.5, 0.60, -140, 0, 140, 76)
+	btn.focus_mode = Control.FOCUS_NONE
+	_place(btn, 0.5, 0.60, 0.5, 0.60, 20, 0, 300, 76)
 	btn.pressed.connect(_on_restart)
 	_end_root.add_child(btn)
 
@@ -600,6 +613,50 @@ func _build() -> void:
 		InputState.set_gyro(on)
 	)
 
+	# Spectator overlay
+	_spec_root = Control.new()
+	_spec_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_spec_root.mouse_filter = Control.MOUSE_FILTER_STOP
+	_spec_root.visible = false
+	add_child(_spec_root)
+
+	var spec_panel := PanelContainer.new()
+	_place(spec_panel, 0.5, 0.04, 0.5, 0.04, -280, 0, 280, 120)
+	var ssb2 := StyleBoxFlat.new()
+	ssb2.bg_color = Color(0.05, 0.07, 0.10, 0.92)
+	ssb2.border_color = Color(0.35, 0.55, 0.75, 0.7)
+	ssb2.set_border_width_all(2)
+	ssb2.set_corner_radius_all(6)
+	spec_panel.add_theme_stylebox_override("panel", ssb2)
+	_spec_root.add_child(spec_panel)
+
+	var sv := VBoxContainer.new()
+	sv.add_theme_constant_override("separation", 6)
+	spec_panel.add_child(sv)
+
+	_spec_label = Label.new()
+	_spec_label.text = "观战中"
+	_spec_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_spec_label.add_theme_font_size_override("font_size", 22)
+	sv.add_child(_spec_label)
+
+	var sh := HBoxContainer.new()
+	sh.alignment = BoxContainer.ALIGNMENT_CENTER
+	sh.add_theme_constant_override("separation", 16)
+	var next_btn := Button.new()
+	next_btn.text = "切换目标"
+	next_btn.focus_mode = Control.FOCUS_NONE
+	next_btn.add_theme_font_size_override("font_size", 18)
+	next_btn.pressed.connect(_on_next_spectate)
+	sh.add_child(next_btn)
+	var restart_btn := Button.new()
+	restart_btn.text = "再来一局"
+	restart_btn.focus_mode = Control.FOCUS_NONE
+	restart_btn.add_theme_font_size_override("font_size", 18)
+	restart_btn.pressed.connect(_on_restart)
+	sh.add_child(restart_btn)
+	sv.add_child(sh)
+
 
 # --------------------------------------------------------------------------
 # Public API
@@ -622,7 +679,10 @@ func update_hud() -> void:
 		String(Scopes.get_def(p.current_scope())["short"])
 	]
 	_slots_label.text = _slot_text(p)
-	_alive_label.text = "存活 %d  ·  击杀 %d" % [game.alive, game.kills]
+	if game.range_mode:
+		_alive_label.text = "训练场 · 命中 %d" % game.target_hits
+	else:
+		_alive_label.text = "存活 %d  ·  击杀 %d" % [game.alive, game.kills]
 	_zone_label.text = game.zone.status_text()
 
 	if p.state == 0:
@@ -686,13 +746,26 @@ func set_center(text: String, duration: float) -> void:
 
 
 func show_end(win: bool, kills: int, place: int) -> void:
+	_spec_root.visible = false
 	_end_root.visible = true
+	_spec_btn.disabled = game == null or game.range_mode or game.alive <= 0
 	if win:
 		_end_title.text = "大吉大利，今晚吃鸡！"
 		_end_sub.text = "击杀 %d  ·  第 1 名" % kills
 	else:
 		_end_title.text = "被淘汰了"
 		_end_sub.text = "击杀 %d  ·  第 %d 名" % [kills, place]
+
+
+func show_spectate(name: String) -> void:
+	_end_root.visible = false
+	_spec_root.visible = true
+	_spec_label.text = "观战中：" + name
+
+
+func set_spectate_name(name: String) -> void:
+	if _spec_root.visible:
+		_spec_label.text = "观战中：" + name
 
 
 # --------------------------------------------------------------------------
@@ -747,6 +820,16 @@ func _process(delta: float) -> void:
 		for e in _feed:
 			lines.append(String(e["text"]))
 		_feed_label.text = "[right]" + "\n".join(lines) + "[/right]"
+
+
+func _on_spectate() -> void:
+	if game != null:
+		game.start_spectate()
+
+
+func _on_next_spectate() -> void:
+	if game != null:
+		game.next_spectate()
 
 
 func _on_restart() -> void:

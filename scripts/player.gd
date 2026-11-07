@@ -46,6 +46,8 @@ var scan_cd := 0.0
 var pitch := -0.10
 var hit_from_dir := Vector3.ZERO
 var hit_from_t := 0.0
+var last_attacker: Node = null
+var infinite_ammo := false
 var _fire_cd := 0.0
 var _reload_t := 0.0
 var _reloading := false
@@ -87,6 +89,15 @@ func can_be_targeted() -> bool:
 	return state == State.PLAY and health > 0.0
 
 
+func spawn_ready(pos: Vector3, yaw: float) -> void:
+	state = State.PLAY
+	global_position = pos
+	rotation.y = yaw
+	velocity = Vector3.ZERO
+	_chute_open = false
+	parachute.close()
+
+
 # --------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
@@ -125,6 +136,8 @@ func _process(delta: float) -> void:
 	_hurt_cd = maxf(0.0, _hurt_cd - delta)
 	switching = maxf(0.0, switching - delta)
 	hit_from_t = maxf(0.0, hit_from_t - delta)
+	if infinite_ammo:
+		slots[active]["reserve"] = 999
 	InputState.medkit_count = medkits
 	InputState.grenade_count = grenades
 	InputState.scan_cd = scan_cd
@@ -572,6 +585,7 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 		armor -= absorbed
 		amount -= absorbed
 	if attacker != null and is_instance_valid(attacker):
+		last_attacker = attacker
 		hit_from_dir = (attacker.global_position - global_position).normalized()
 		hit_from_t = 1.0
 	health = maxf(0.0, health - amount)

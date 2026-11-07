@@ -172,7 +172,7 @@ func _pick_target() -> void:
 	if best != target:
 		target = best
 		if best != null:
-			_alert_t = randf_range(0.45, 1.0)
+			_alert_t = randf_range(0.45, 1.0) * Meta.bot_reaction_scale()
 			_alert = true
 			_show_alert()
 		else:
@@ -206,12 +206,12 @@ func _pick_wander() -> void:
 
 func _shoot(t: Node3D) -> void:
 	var def := Weapons.get_def(weapon_id)
-	_fire_cd = clampf(60.0 / float(def["rpm"]) * randf_range(1.8, 3.0), 0.5, 1.6)
+	_fire_cd = clampf(60.0 / float(def["rpm"]) * randf_range(1.8, 3.0), 0.5, 1.6) * Meta.bot_interval_scale()
 
 	var from := global_position + Vector3(0.0, 1.5, 0.0)
 	var aim := t.global_position + Vector3(0.0, 1.0, 0.0)
 	var dir := (aim - from).normalized()
-	var spread := deg_to_rad(float(def["spread_deg"])) * 1.4 + 0.02
+	var spread := (deg_to_rad(float(def["spread_deg"])) * 1.4 + 0.02) * Meta.bot_spread_scale()
 	dir = (dir + Vector3(randf_range(-spread, spread), randf_range(-spread, spread), randf_range(-spread, spread))).normalized()
 
 	var max_range := minf(RANGE, float(def["range"]))
@@ -227,6 +227,7 @@ func _shoot(t: Node3D) -> void:
 				dmg = 16.0
 			elif weapon_id == "sniper":
 				dmg = 42.0
+			dmg *= Meta.bot_damage_scale()
 			if c.has_method("is_alive") and float(hit["position"].y) >= c.global_position.y + 1.45:
 				dmg *= 1.8
 			c.take_damage(dmg * randf_range(0.85, 1.15), self)

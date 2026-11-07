@@ -13,13 +13,20 @@ assets/
   audio/               音效 WAV
   models/              可选的真模型皮肤（.glb）
 scenes/
-  main.tscn            场景根：环境、太阳、地形、安全区、HUD、触屏
+  menu.tscn            开始界面（模式 / 难度 / 皮肤预览 / 设置）
+  main.tscn            对局根场景：环境、太阳、地形、安全区、HUD、触屏
   player.tscn          玩家：碰撞体 + Visual + 过肩相机 + 枪口
-  bot.tscn             AI：碰撞体 + Visual
+  bot.tscn             AI：碰撞体 + Visual + 发现提示
+  target.tscn          训练场靶子
   loot.tscn            武器箱
   medkit.tscn          医疗包
+  armor.tscn           护甲
+  grenade.tscn         投掷中的手雷
+  grenade_pickup.tscn  手雷拾取
   scope.tscn           瞄具拾取物
 scripts/
+  menu.gd              开始界面与 3D 预览
+  meta.gd              模式与难度配置
   input_state.gd       全局输入层（触屏 / 键盘 / 鼠标统一）
   player.gd            移动、跳伞、射击、换弹、槽位、瞄具、受伤
   bot.gd               索敌、进圈、走位、射击、死亡
@@ -36,7 +43,8 @@ scripts/
   grenade_pickup.gd    手雷拾取
   scope_pickup.gd      瞄具拾取
   minimap.gd           小地图
-  game.gd              开局生成、存活统计、胜负判定
+  target.gd            训练场靶子
+  game.gd              开局生成、存活统计、胜负判定、训练场、观战
   hud.gd               血条、弹药、槽位、播报、配件面板、镜圈
   touch_controls.gd    虚拟摇杆、视角拖动、按钮
   sfx.gd               音效池（2D + 3D 距离衰减）
@@ -48,6 +56,7 @@ scripts/
 |---|---|---|
 | `InputState` | `scripts/input_state.gd` | 汇总触屏/键盘/鼠标输入，提供 `move`、`look`、`fire`、`aim` 等状态和一次性事件 |
 | `Sfx` | `scripts/sfx.gd` | 预加载音效、管理 2D/3D 播放器池、总线、混响与环境音 |
+| `Meta` | `scripts/meta.gd` | 当前模式（大逃杀/训练场）与难度，向 AI 提供倍率 |
 
 ## 输入链路
 
