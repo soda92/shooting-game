@@ -1,7 +1,7 @@
 extends Node3D
 ## Match controller: spawns combatants and loot, runs zone damage, win/lose.
 
-const BOT_COUNT := 15
+const BOT_COUNT := 18
 const LOOT_COUNT := 50
 const MEDKIT_COUNT := 18
 const SCOPE_COUNT := 10
@@ -66,7 +66,7 @@ func _ready() -> void:
 	armor_count = int(round(ARMOR_COUNT * map_scale))
 	grenade_count = int(round(GRENADE_COUNT * map_scale))
 	spawn_radius = world.world_size * 0.31
-	bot_radius = world.world_size * 0.37
+	bot_radius = world.world_size * 0.34
 	zone_radius = world.world_size * 0.466
 
 	range_mode = Meta.mode == "range"

@@ -62,6 +62,19 @@ func _physics_process(delta: float) -> void:
 	if not alive:
 		return
 
+	# Let the opening plane/drop finish before bots start fighting each other.
+	if game != null and game.player != null and game.player.has_method("is_airborne") \
+			and game.player.is_airborne():
+		velocity.x = 0.0
+		velocity.z = 0.0
+		if not is_on_floor():
+			velocity.y -= GRAVITY * delta
+		else:
+			velocity.y = 0.0
+		move_and_slide()
+		visual.tick(delta, 0.0, false)
+		return
+
 	_retarget -= delta
 	if _retarget <= 0.0:
 		_retarget = randf_range(0.45, 0.9)
@@ -107,22 +120,40 @@ func _physics_process(delta: float) -> void:
 		var back := -Vector3(global_position.x, 0.0, global_position.z).normalized()
 		desired += back * 1.5
 
-	# Rotate toward the safe zone instead of dying outside it.
+	# Head for the next circle during the waiting phase, not only after the
+	# current wall starts moving. This is what makes bots actually run poison.
+	var zone_urgent := false
 	if game != null and game.zone != null:
 		var zone = game.zone
 		var flat := Vector2(global_position.x - zone.center.x, global_position.z - zone.center.z)
-		var near_edge: bool = flat.length() > zone.radius - 15.0
-		if not zone.is_inside(global_position) or (zone.shrinking and near_edge):
-			var to_c := Vector3(zone.center.x - global_position.x, 0.0, zone.center.z - global_position.z)
+		var target_r: float = zone.target_radius()
+		var target_c: Vector3 = zone.target_center()
+		var next_flat := Vector2(global_position.x - target_c.x, global_position.z - target_c.z)
+		if not zone.is_inside(global_position):
+			var to_c := Vector3(-flat.x, 0.0, -flat.y)
 			if to_c.length() > 0.5:
 				desired = to_c.normalized()
-				rotation.y = lerp_angle(rotation.y, atan2(-desired.x, -desired.z), 6.0 * delta)
+				rotation.y = lerp_angle(rotation.y, atan2(-desired.x, -desired.z), 7.0 * delta)
+				zone_urgent = true
+		elif target_r > 0.0 and next_flat.length() > target_r * 0.72:
+			var to_next := Vector3(target_c.x - global_position.x, 0.0, target_c.z - global_position.z)
+			if to_next.length() > 0.5:
+				desired = to_next.normalized()
+				rotation.y = lerp_angle(rotation.y, atan2(-desired.x, -desired.z), 7.0 * delta)
+				zone_urgent = true
+		elif zone.shrinking and flat.length() > zone.radius - 25.0:
+			var to_now := Vector3(-flat.x, 0.0, -flat.y)
+			if to_now.length() > 0.5:
+				desired = to_now.normalized()
+				rotation.y = lerp_angle(rotation.y, atan2(-desired.x, -desired.z), 7.0 * delta)
+				zone_urgent = true
 
 	var water_h: float = world.height_at(global_position.x, global_position.z) if world != null else 999.0
 	var swimming := water_h < -0.6 and global_position.y < 1.2
+	var speed := SPEED * (1.65 if zone_urgent else 1.0)
 
-	velocity.x = desired.x * SPEED * (0.6 if swimming else 1.0)
-	velocity.z = desired.z * SPEED * (0.6 if swimming else 1.0)
+	velocity.x = desired.x * speed * (0.6 if swimming else 1.0)
+	velocity.z = desired.z * speed * (0.6 if swimming else 1.0)
 	if swimming:
 		velocity.y = clampf((0.2 - global_position.y) * 6.0, -3.0, 4.0)
 	elif not is_on_floor():
