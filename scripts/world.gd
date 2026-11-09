@@ -416,6 +416,24 @@ func _build_pois() -> void:
 	print("[world] POIs=%d loot spots=%d" % [poi_centers.size(), loot_spots.size()])
 
 
+func _glass_mat(c: Color) -> StandardMaterial3D:
+	var m := _poi_mat(c)
+	m.metallic = 0.25
+	m.roughness = 0.18
+	m.emission_enabled = true
+	m.emission = c
+	m.emission_energy_multiplier = 0.12
+	return m
+
+
+func _lamp_mat(c: Color) -> StandardMaterial3D:
+	var m := _poi_mat(c)
+	m.emission_enabled = true
+	m.emission = c
+	m.emission_energy_multiplier = 2.5
+	return m
+
+
 func _poi_mat(c: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
@@ -454,7 +472,11 @@ func _build_compound(p: Vector3, index: int) -> void:
 		"metal": _poi_mat(Color(0.42, 0.24, 0.18)),
 		"trim": _poi_mat(Color(0.34, 0.35, 0.38)),
 		"concrete": _poi_mat(Color(0.55, 0.55, 0.52)),
-		"window": _poi_mat(Color(0.16, 0.27, 0.34)),
+		"window": _glass_mat(Color(0.22, 0.42, 0.58)),
+		"wood": _poi_mat(Color(0.24, 0.15, 0.09)),
+		"fabric": _poi_mat(Color(0.78, 0.76, 0.70)),
+		"rug": _poi_mat(Color(0.34, 0.18, 0.16)),
+		"lamp": _lamp_mat(Color(1.0, 0.79, 0.48)),
 		"plaza": _surface_mat(Color(0.56, 0.56, 0.53)),
 		"road": _surface_mat(Color(0.20, 0.21, 0.24)),
 		"line": _surface_mat(Color(0.80, 0.68, 0.30)),
@@ -502,9 +524,10 @@ func _commit_poi(root: Node3D, mats: Dictionary, boxes: Array) -> void:
 		if b.has("rot"):
 			xf.basis = Basis.from_euler(b["rot"])
 
-		var bm := BoxMesh.new()
-		bm.size = b["size"]
-		groups[key].append_from(bm, 0, xf)
+		if not b.get("no_mesh", false):
+			var bm := BoxMesh.new()
+			bm.size = b["size"]
+			groups[key].append_from(bm, 0, xf)
 
 		if b.get("solid", true):
 			var shape := BoxShape3D.new()
@@ -513,6 +536,15 @@ func _commit_poi(root: Node3D, mats: Dictionary, boxes: Array) -> void:
 			col.shape = shape
 			col.transform = xf
 			body.add_child(col)
+
+		if b.get("light", false):
+			var light := OmniLight3D.new()
+			light.position = b["pos"]
+			light.light_color = Color(1.0, 0.86, 0.62)
+			light.light_energy = float(b.get("light_energy", 0.9))
+			light.omni_range = float(b.get("light_range", 9.0))
+			light.shadow_enabled = false
+			root.add_child(light)
 
 	for key in groups:
 		var mi := MeshInstance3D.new()
@@ -614,7 +646,7 @@ func _city_boxes(boxes: Array, spots: Array) -> void:
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
 			var c := Vector3(sx * 25.0, 0.0, sz * 25.0)
-			_city_building(boxes, spots, c, 16.0, 12.0, 5.0, -sz)
+			_city_building(boxes, spots, c, 16.0, 12.0, 2 if sx * sz > 0.0 else 3, -sz)
 
 	# Street lamps.
 	for sx in [-1.0, 1.0]:
@@ -636,7 +668,9 @@ func _city_boxes(boxes: Array, spots: Array) -> void:
 
 
 func _city_building(boxes: Array, spots: Array, c: Vector3,
-		w: float, d: float, h: float, door_sign: float) -> void:
+		w: float, d: float, floors: int, door_sign: float) -> void:
+	var floor_h := 3.0
+	var h := float(floors) * floor_h
 	var ext := 3.0
 	var total := h + ext
 	var cy := (h - ext) * 0.5
@@ -657,15 +691,33 @@ func _city_building(boxes: Array, spots: Array, c: Vector3,
 		"pos": c + Vector3(0, (h + 2.3) * 0.5, dz),
 		"mat": "wall",
 	})
-	boxes.append({"size": Vector3(w + 0.6, 0.3, d + 0.6), "pos": c + Vector3(0, h + 0.15, 0), "mat": "roof"})
 
-	# Windows: two per wall, slightly proud of the facade.
-	for wx in [-w * 0.25, w * 0.25]:
-		boxes.append({"size": Vector3(1.4, 1.1, 0.1), "pos": c + Vector3(wx, 2.7, -door_sign * d * 0.5 + door_sign * -0.18), "mat": "window", "solid": false})
-		boxes.append({"size": Vector3(1.4, 1.1, 0.1), "pos": c + Vector3(wx, 2.7, dz + door_sign * 0.18), "mat": "window", "solid": false})
-	for wz in [-d * 0.25, d * 0.25]:
-		boxes.append({"size": Vector3(0.1, 1.1, 1.4), "pos": c + Vector3(-w * 0.5 - 0.18, 2.7, wz), "mat": "window", "solid": false})
-		boxes.append({"size": Vector3(0.1, 1.1, 1.4), "pos": c + Vector3(w * 0.5 + 0.18, 2.7, wz), "mat": "window", "solid": false})
+	# Flat roof and a low parapet.
+	boxes.append({"size": Vector3(w + 0.6, 0.3, d + 0.6), "pos": c + Vector3(0, h + 0.15, 0), "mat": "roof"})
+	for sx in [-1.0, 1.0]:
+		boxes.append({"size": Vector3(t, 0.8, d + 0.2), "pos": c + Vector3(sx * w * 0.5, h + 0.55, 0), "mat": "roof"})
+	for sz in [-1.0, 1.0]:
+		boxes.append({"size": Vector3(w + 0.2, 0.8, t), "pos": c + Vector3(0, h + 0.55, sz * d * 0.5), "mat": "roof"})
+
+	# Windows and sills on every floor.
+	for f in range(floors):
+		var wy := float(f) * floor_h + 1.7
+		for wx in [-w * 0.25, w * 0.25]:
+			for sz in [-1.0, 1.0]:
+				var wz: float = float(sz) * (d * 0.5 + 0.12)
+				boxes.append({"size": Vector3(1.4, 1.1, 0.1), "pos": c + Vector3(wx, wy, wz), "mat": "window", "solid": false})
+				boxes.append({"size": Vector3(1.7, 0.12, 0.3), "pos": c + Vector3(wx, wy - 0.64, wz), "mat": "trim", "solid": false})
+				boxes.append({"size": Vector3(1.7, 0.10, 0.16), "pos": c + Vector3(wx, wy + 0.60, wz), "mat": "trim", "solid": false})
+				boxes.append({"size": Vector3(0.10, 1.3, 0.16), "pos": c + Vector3(wx - 0.75, wy, wz), "mat": "trim", "solid": false})
+				boxes.append({"size": Vector3(0.10, 1.3, 0.16), "pos": c + Vector3(wx + 0.75, wy, wz), "mat": "trim", "solid": false})
+		for wz in [-d * 0.25, d * 0.25]:
+			for sx in [-1.0, 1.0]:
+				var wx: float = float(sx) * (w * 0.5 + 0.12)
+				boxes.append({"size": Vector3(0.1, 1.1, 1.4), "pos": c + Vector3(wx, wy, wz), "mat": "window", "solid": false})
+				boxes.append({"size": Vector3(0.3, 0.12, 1.7), "pos": c + Vector3(wx, wy - 0.64, wz), "mat": "trim", "solid": false})
+				boxes.append({"size": Vector3(0.16, 0.10, 1.7), "pos": c + Vector3(wx, wy + 0.60, wz), "mat": "trim", "solid": false})
+				boxes.append({"size": Vector3(0.16, 1.3, 0.10), "pos": c + Vector3(wx, wy, wz - 0.75), "mat": "trim", "solid": false})
+				boxes.append({"size": Vector3(0.16, 1.3, 0.10), "pos": c + Vector3(wx, wy, wz + 0.75), "mat": "trim", "solid": false})
 
 	# Door frame.
 	for sx in [-1.0, 1.0]:
@@ -682,9 +734,147 @@ func _city_building(boxes: Array, spots: Array, c: Vector3,
 		"solid": false,
 	})
 
+	# Two side stair strips keep the upper flight out from over the lower one.
+	var stair_w := 1.5
+	var left_x0 := -w * 0.5 + 0.2
+	var left_x1 := left_x0 + stair_w
+	var right_x0 := w * 0.5 - 1.7
+	var right_x1 := right_x0 + stair_w
+	var left_x := (left_x0 + left_x1) * 0.5
+	var right_x := (right_x0 + right_x1) * 0.5
+	var slab_r := right_x0 - 0.1
+	var slab_l := (-w * 0.5 + 0.15) if floors == 2 else (left_x1 + 0.1)
+	var z_front := door_sign * (d * 0.5 - 0.8)
+	var z_back := -door_sign * (d * 0.5 - 0.8)
+
+	for f in range(1, floors):
+		var fy := float(f) * floor_h - 0.11
+		boxes.append({
+			"size": Vector3(slab_r - slab_l, 0.22, d - 0.3),
+			"pos": c + Vector3((slab_l + slab_r) * 0.5, fy, 0),
+			"mat": "concrete",
+		})
+
+	for f in range(floors):
+		var by := float(f) * floor_h
+		# Room partition with a 1.4m doorway.
+		var px0 := slab_l + 0.2
+		var px1 := slab_r - 0.2
+		var dx := -1.0
+		var left_w := (dx - 0.7) - px0
+		var right_w := px1 - (dx + 0.7)
+		if left_w > 0.2:
+			boxes.append({"size": Vector3(left_w, floor_h - 0.05, 0.18), "pos": c + Vector3(px0 + left_w * 0.5, by + floor_h * 0.5, 0), "mat": "wall"})
+		if right_w > 0.2:
+			boxes.append({"size": Vector3(right_w, floor_h - 0.05, 0.18), "pos": c + Vector3(dx + 0.7 + right_w * 0.5, by + floor_h * 0.5, 0), "mat": "wall"})
+		boxes.append({"size": Vector3(1.4, 0.8, 0.18), "pos": c + Vector3(dx, by + 2.6, 0), "mat": "wall"})
+
+		# Beds, bedside tables, rugs, tables and wardrobes.
+		for side in [-1.0, 1.0]:
+			var side_z: float = float(side) * d * 0.30
+			_add_bed(boxes, c + Vector3(-w * 0.26, by, side_z))
+			boxes.append({"size": Vector3(3.0, 0.02, 2.4), "pos": c + Vector3(-w * 0.26, by + 0.015, side_z), "mat": "rug", "solid": false})
+			_add_table(boxes, c + Vector3(2.4, by, side_z))
+			_add_wardrobe(boxes, c + Vector3(w * 0.30, by, side_z + 1.5))
+		boxes.append({
+			"size": Vector3(0.7, 0.07, 0.7),
+			"pos": c + Vector3(-w * 0.16, by + 2.82, -d * 0.18),
+			"mat": "lamp",
+			"solid": false,
+		})
+
+	# One soft interior light per building keeps mobile draw cost low.
+	boxes.append({
+		"size": Vector3(0.1, 0.1, 0.1),
+		"pos": c + Vector3(-w * 0.10, h * 0.5, 0.0),
+		"mat": "trim",
+		"solid": false,
+		"no_mesh": true,
+		"light": true,
+		"light_energy": 1.2,
+		"light_range": 16.0,
+	})
+
+	# Run 1 climbs on the right; run 2 climbs on the left.
+	for f in range(floors - 1):
+		var next_y := float(f + 1) * floor_h
+		if f % 2 == 0:
+			_add_stairs(boxes, c + Vector3(right_x, 0, 0), z_front, z_back,
+				float(f) * floor_h, next_y, stair_w)
+			# A top landing so the player can step off the ramp onto the floor.
+			var wall_z := -door_sign * d * 0.5
+			boxes.append({
+				"size": Vector3(stair_w, 0.22, absf(wall_z - z_back)),
+				"pos": c + Vector3(right_x, next_y - 0.11, (z_back + wall_z) * 0.5),
+				"mat": "concrete",
+			})
+		else:
+			_add_stairs(boxes, c + Vector3(left_x, 0, 0), z_back, z_front,
+				float(f) * floor_h, next_y, stair_w)
+			var wall_z := door_sign * d * 0.5
+			boxes.append({
+				"size": Vector3(stair_w, 0.22, absf(wall_z - z_front)),
+				"pos": c + Vector3(left_x, next_y - 0.11, (z_front + wall_z) * 0.5),
+				"mat": "concrete",
+			})
+
 	spots.append(c + Vector3(0.0, 0.0, 0.0))
 	spots.append(c + Vector3(-w * 0.25, 0.0, d * 0.2))
 	spots.append(c + Vector3(w * 0.25, 0.0, -d * 0.2))
+
+
+func _add_stairs(boxes: Array, base: Vector3, z0: float, z1: float,
+		y0: float, y1: float, width: float) -> void:
+	var run := absf(z1 - z0)
+	var rise := y1 - y0
+	var length := sqrt(run * run + rise * rise)
+	var steps := maxi(10, int(ceil(rise / 0.19)))
+	var tread := run / float(steps)
+	for i in range(steps):
+		var t := (float(i) + 0.5) / float(steps)
+		var z := lerpf(z0, z1, t)
+		var top := lerpf(y0, y1, t)
+		boxes.append({
+			"size": Vector3(width, rise / float(steps), tread * 1.04),
+			"pos": base + Vector3(0, top - rise / float(steps) * 0.5, z),
+			"mat": "wood",
+			"solid": false,
+		})
+
+	var angle := atan2(rise, z0 - z1)
+	boxes.append({
+		"size": Vector3(width, 0.16, length),
+		"pos": base + Vector3(0, (y0 + y1) * 0.5, (z0 + z1) * 0.5),
+		"rot": Vector3(angle, 0.0, 0.0),
+		"mat": "concrete",
+		"no_mesh": true,
+	})
+
+
+func _add_bed(boxes: Array, base: Vector3) -> void:
+	boxes.append({"size": Vector3(2.0, 0.18, 1.2), "pos": base + Vector3(0, 0.09, 0), "mat": "wood", "solid": false})
+	boxes.append({"size": Vector3(1.85, 0.28, 1.05), "pos": base + Vector3(0, 0.32, 0), "mat": "fabric", "solid": false})
+	boxes.append({"size": Vector3(0.55, 0.18, 0.9), "pos": base + Vector3(-0.62, 0.51, 0), "mat": "fabric", "solid": false})
+	boxes.append({"size": Vector3(1.05, 0.07, 1.05), "pos": base + Vector3(0.38, 0.48, 0), "mat": "rug", "solid": false})
+	boxes.append({"size": Vector3(0.12, 1.0, 1.2), "pos": base + Vector3(-1.02, 0.55, 0), "mat": "wood", "solid": false})
+	boxes.append({"size": Vector3(0.6, 0.6, 0.6), "pos": base + Vector3(1.28, 0.30, 0.9), "mat": "wood", "solid": false})
+
+
+func _add_table(boxes: Array, base: Vector3) -> void:
+	boxes.append({"size": Vector3(1.4, 0.10, 0.9), "pos": base + Vector3(0, 0.75, 0), "mat": "wood", "solid": false})
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			boxes.append({"size": Vector3(0.10, 0.72, 0.10), "pos": base + Vector3(sx * 0.58, 0.36, sz * 0.34), "mat": "wood", "solid": false})
+	boxes.append({"size": Vector3(0.55, 0.08, 0.55), "pos": base + Vector3(0, 0.45, 0.85), "mat": "wood", "solid": false})
+	boxes.append({"size": Vector3(0.08, 0.45, 0.08), "pos": base + Vector3(-0.18, 0.22, 0.85), "mat": "wood", "solid": false})
+	boxes.append({"size": Vector3(0.08, 0.45, 0.08), "pos": base + Vector3(0.18, 0.22, 0.85), "mat": "wood", "solid": false})
+
+
+func _add_wardrobe(boxes: Array, base: Vector3) -> void:
+	boxes.append({"size": Vector3(1.25, 2.0, 0.55), "pos": base + Vector3(0, 1.0, 0), "mat": "wood", "solid": false})
+	boxes.append({"size": Vector3(1.0, 0.06, 0.05), "pos": base + Vector3(0, 1.05, -0.29), "mat": "trim", "solid": false})
+	boxes.append({"size": Vector3(0.05, 0.20, 0.05), "pos": base + Vector3(-0.15, 1.05, -0.31), "mat": "trim", "solid": false})
+	boxes.append({"size": Vector3(0.05, 0.20, 0.05), "pos": base + Vector3(0.15, 1.05, -0.31), "mat": "trim", "solid": false})
 
 
 func _build_bridge() -> void:
