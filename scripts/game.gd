@@ -13,6 +13,7 @@ const ARMOR_SCENE := preload("res://scenes/armor.tscn")
 const GRENADE_PICKUP_SCENE := preload("res://scenes/grenade_pickup.tscn")
 const SCOPE_IDS := ["red_dot", "4x", "8x"]
 const TARGET_SCENE := preload("res://scenes/target.tscn")
+const PLANE_SCRIPT := preload("res://scripts/plane.gd")
 
 @onready var world = $World
 @onready var zone = $Zone
@@ -44,6 +45,11 @@ var spectating := false
 var spectate_target: Node3D = null
 var spec_cam: Camera3D = null
 
+var plane = null
+var plane_start := Vector3.ZERO
+var plane_end := Vector3.ZERO
+var plane_force_distance := -1.0
+
 
 func _ready() -> void:
 	randomize()
@@ -71,6 +77,7 @@ func _ready() -> void:
 		zone.visible = false
 	else:
 		zone.reset(zone_radius, map_scale)
+		zone.set_process(false)
 	zone.phase_changed.connect(_on_zone_phase)
 
 	_spawn_player()
@@ -87,7 +94,9 @@ func _ready() -> void:
 		_spawn_grenades()
 
 	hud.setup(self)
-	hud.set_center("训练场：打靶 / 无限弹药" if range_mode else "从空中选择落点", 2.5)
+	hud.set_center("训练场：打靶 / 无限弹药" if range_mode else "运输机进场  ·  选择落点", 2.5)
+	if not range_mode:
+		hud.flash_hint("不跳伞将在安全区边缘自动跳伞")
 
 
 func _process(delta: float) -> void:
@@ -103,6 +112,9 @@ func _process(delta: float) -> void:
 		hud.update_hud()
 		return
 
+	if not range_mode and player != null and player.in_plane() and not over:
+		hud.set_center("按跳跃键跳伞  ·  选择落点", 0.3)
+
 	if zone.dps > 0.0:
 		for n in get_tree().get_nodes_in_group("combatants"):
 			if not is_instance_valid(n) or not n.has_method("is_alive") or not n.is_alive():
@@ -115,11 +127,47 @@ func _process(delta: float) -> void:
 
 # --------------------------------------------------------------------------
 
+func _make_plane_path() -> void:
+	var a := randf() * TAU
+	var dir := Vector3(cos(a), 0.0, sin(a))
+	var half: float = world.world_size * 0.56
+	var side := Vector3(-dir.z, 0.0, dir.x) * randf_range(-world.world_size * 0.12, world.world_size * 0.12)
+	plane_start = -dir * half + side + Vector3(0.0, 190.0, 0.0)
+	plane_end = dir * half + side + Vector3(0.0, 190.0, 0.0)
+
+	# Force ejection where the route leaves the first safe zone.
+	var flat := Vector2(plane_start.x, plane_start.z)
+	var fdir := Vector2(dir.x, dir.z)
+	var b := flat.dot(fdir)
+	var c: float = flat.length_squared() - float(zone.radius) * float(zone.radius)
+	var disc: float = b * b - c
+	if disc >= 0.0:
+		var t := -b + sqrt(disc)
+		plane_force_distance = clampf(t, 0.0, plane_start.distance_to(plane_end))
+	else:
+		plane_force_distance = plane_start.distance_to(plane_end)
+
+
+func _spawn_plane() -> void:
+	plane = PLANE_SCRIPT.new()
+	add_child(plane)
+	plane.process_priority = -10
+	plane.setup(plane_start, plane_end)
+	plane.set_force_distance(plane_force_distance)
+	plane.force_jump.connect(_on_plane_force_jump)
+	plane.finished.connect(_on_plane_finished)
+
+
 func _spawn_player() -> void:
 	var scene: PackedScene = load("res://scenes/player.tscn")
 	player = scene.instantiate()
-	var p: Vector3 = world.random_open_point(spawn_radius, 40.0 * map_scale)
-	player.position = Vector3(p.x, p.y + 120.0, p.z)
+	var p: Vector3
+	if range_mode:
+		p = world.random_open_point(spawn_radius, 40.0 * map_scale)
+	else:
+		_make_plane_path()
+		p = plane_start
+	player.position = p
 	player.rotation.y = randf() * TAU
 	add_child(player)
 	player.setup(world, self)
@@ -135,6 +183,9 @@ func _spawn_player() -> void:
 	if range_mode:
 		player.infinite_ammo = true
 		player.spawn_ready(Vector3(p.x, p.y + 1.0, p.z), randf() * TAU)
+	else:
+		_spawn_plane()
+		player.board_plane(plane)
 
 
 func _spawn_bots() -> void:
@@ -365,9 +416,24 @@ func drop_weapon_at(id: String, pos: Vector3) -> void:
 # Signals
 # --------------------------------------------------------------------------
 
+func _on_plane_force_jump() -> void:
+	if player != null and player.in_plane():
+		player.jump_from_plane()
+		hud.flash_hint("已到安全区边缘 · 自动跳伞")
+
+
+func _on_plane_finished() -> void:
+	if player != null and player.in_plane():
+		player.jump_from_plane()
+	hud.flash_hint("运输机已离开")
+	plane = null
+
+
 func _on_player_landed() -> void:
 	hud.set_center("", 0.1)
 	hud.flash_hint("落地！搜集武器，活到最后")
+	zone.set_process(true)
+	plane = null
 
 
 func _on_player_damaged(amount: float) -> void:

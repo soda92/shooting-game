@@ -10,7 +10,7 @@ signal healed(amount: float)
 signal scan_started
 signal scope_added(id: String)
 
-enum State { DROP, PLAY, DEAD }
+enum State { PLANE, DROP, PLAY, DEAD }
 
 const WALK := 6.0
 const SPRINT := 9.5
@@ -19,7 +19,9 @@ const SWIM_SPEED := 3.4
 const JUMP_V := 6.8
 const GRAVITY := 20.0
 const LOOK_SENS := 0.0032
-const FREE_FALL_TIME := 2.6
+const AUTO_CHUTE_ALT := 70.0
+const CHUTE_FALL := -6.5
+const CHUTE_SPEED := 8.5
 const MAX_MEDKITS := 3
 const MEDKIT_HEAL := 40.0
 const SCAN_TIME := 6.0
@@ -52,7 +54,7 @@ var infinite_ammo := false
 var _fire_cd := 0.0
 var _reload_t := 0.0
 var _reloading := false
-var _drop_t := 0.0
+var plane = null
 var _fov := 72.0
 var _tracer_mat: StandardMaterial3D
 var _hurt_cd := 0.0
@@ -75,6 +77,7 @@ func _ready() -> void:
 	slots = [_make_slot("rifle"), {}]
 	active = 0
 	spring.rotation.x = pitch
+	spring.add_excluded_object(get_rid())
 
 
 func setup(w: Node3D, g: Node) -> void:
@@ -90,7 +93,49 @@ func can_be_targeted() -> bool:
 	return state == State.PLAY and health > 0.0
 
 
+func board_plane(p: Node3D) -> void:
+	plane = p
+	state = State.PLANE
+	global_position = p.global_position
+	rotation.y = p.rotation.y
+	velocity = Vector3.ZERO
+	_chute_open = false
+	parachute.close()
+	visual.visible = false
+
+
+func in_plane() -> bool:
+	return state == State.PLANE
+
+
+func is_airborne() -> bool:
+	return state == State.PLANE or state == State.DROP
+
+
+func jump_from_plane() -> void:
+	if state != State.PLANE:
+		return
+	var p = plane
+	if p != null and is_instance_valid(p):
+		global_position = p.global_position + Vector3(0.0, -1.5, 0.0)
+		rotation.y = p.rotation.y
+		velocity = -p.global_transform.basis.z * 10.0 + Vector3(0.0, -6.0, 0.0)
+	plane = null
+	state = State.DROP
+	visual.visible = true
+	_chute_open = false
+	parachute.close()
+	Sfx.play("pickup", -14.0, 0.55)
+	if game != null and game.hud != null:
+		game.hud.flash_hint("自由落体：按跳跃键开伞")
+
+
+func is_parachuting() -> bool:
+	return _chute_open
+
+
 func spawn_ready(pos: Vector3, yaw: float) -> void:
+	plane = null
 	state = State.PLAY
 	global_position = pos
 	rotation.y = yaw
@@ -102,6 +147,9 @@ func spawn_ready(pos: Vector3, yaw: float) -> void:
 # --------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if state == State.PLANE and plane != null and is_instance_valid(plane):
+		global_position = plane.global_position
+		rotation.y = plane.rotation.y
 	var look := InputState.consume_look()
 	if state == State.PLAY and not InputState.locked:
 		var sens := LOOK_SENS * InputState.sensitivity * (0.55 if InputState.aim else 1.0)
@@ -128,9 +176,17 @@ func _process(delta: float) -> void:
 	var follow := 1.0 - exp(-16.0 * delta)
 	var arm_target := 0.40 if fp else (3.0 if ads else 4.2)
 	var side_target := 0.0 if fp else (0.80 if ads else 0.55)
+	if state == State.PLANE:
+		arm_target = 22.0
+		side_target = 0.0
+		spring.rotation.x = lerpf(spring.rotation.x, -0.28, follow)
+	elif state == State.DROP:
+		arm_target = 6.5 if _chute_open else 5.0
+		side_target = 0.0
+		spring.rotation.x = lerpf(spring.rotation.x, -0.22, follow)
 	spring.spring_length = lerpf(spring.spring_length, arm_target, follow)
 	pivot.position.x = lerpf(pivot.position.x, side_target, follow)
-	visual.visible = not fp
+	visual.visible = state != State.PLANE and not fp
 
 	scan_t = maxf(0.0, scan_t - delta)
 	scan_cd = maxf(0.0, scan_cd - delta)
@@ -171,12 +227,14 @@ func _process(delta: float) -> void:
 		if _reload_t <= 0.0:
 			_finish_reload()
 
-	if InputState.fire and _fire_cd <= 0.0 and not _reloading and switching <= 0.0:
+	if state == State.PLAY and InputState.fire and _fire_cd <= 0.0 and not _reloading and switching <= 0.0:
 		_shoot()
 
 
 func _physics_process(delta: float) -> void:
 	match state:
+		State.PLANE:
+			_process_plane(delta)
 		State.DROP:
 			_process_drop(delta)
 		State.PLAY:
@@ -187,31 +245,43 @@ func _physics_process(delta: float) -> void:
 			move_and_slide()
 
 
-func _process_drop(delta: float) -> void:
-	_drop_t += delta
-	velocity.y = -24.0 if _drop_t < FREE_FALL_TIME else -7.0
+func _process_plane(delta: float) -> void:
+	if InputState.consume_jump():
+		jump_from_plane()
 
-	if _drop_t >= FREE_FALL_TIME:
-		if not _chute_open:
-			_chute_open = true
-			parachute.open()
-			Sfx.play("pickup", -10.0, 0.6)
-	elif _chute_open:
-		_chute_open = false
-		parachute.close()
+
+func _process_drop(delta: float) -> void:
+	var water_h: float = world.height_at(global_position.x, global_position.z)
+	var ground: float = water_h + 1.0
+	if water_h < -0.6:
+		ground = 0.45
+	var altitude := global_position.y - ground
 
 	var input := InputState.move
 	var dir := global_transform.basis.x * input.x + global_transform.basis.z * -input.y
 	dir.y = 0.0
 	dir = dir.limit_length(1.0)
-	velocity.x = dir.x * 9.0
-	velocity.z = dir.z * 9.0
+
+	var hspeed := CHUTE_SPEED if _chute_open else 16.0
+	var fall := CHUTE_FALL if _chute_open else -28.0
+	if not _chute_open and input.y > 0.35:
+		hspeed = 22.0
+		fall = -38.0
+
+	if not _chute_open:
+		if altitude <= AUTO_CHUTE_ALT or InputState.consume_jump():
+			_chute_open = true
+			parachute.open()
+			Sfx.play("pickup", -8.0, 0.5)
+			if game != null and game.hud != null:
+				game.hud.flash_hint("降落伞已打开")
+
+	var drift := global_transform.basis.z * (-4.0 if _chute_open else -6.0)
+	velocity.x = dir.x * hspeed + drift.x
+	velocity.z = dir.z * hspeed + drift.z
+	velocity.y = fall
 	move_and_slide()
 
-	var water_h: float = world.height_at(global_position.x, global_position.z)
-	var ground: float = water_h + 1.0
-	if water_h < -0.6:
-		ground = 0.45
 	if global_position.y <= ground or is_on_floor():
 		global_position.y = maxf(ground, global_position.y)
 		velocity = Vector3.ZERO

@@ -109,6 +109,26 @@ func _draw() -> void:
 		var tc := _to_map(game.zone.target_center())
 		draw_arc(tc, tr * scale, 0.0, TAU, 72, Color(1, 1, 1, 0.45), 1.0)
 
+	# opening plane route
+	if game.plane != null and is_instance_valid(game.plane):
+		var pa := _to_map(game.plane_start)
+		var pb := _to_map(game.plane_end)
+		pa.x = clampf(pa.x, 3.0, size.x - 3.0)
+		pa.y = clampf(pa.y, 3.0, size.y - 3.0)
+		pb.x = clampf(pb.x, 3.0, size.x - 3.0)
+		pb.y = clampf(pb.y, 3.0, size.y - 3.0)
+		draw_dashed_line(pa, pb, Color(1.0, 0.83, 0.30, 0.85), 2.0, 5.0)
+		var pp := _to_map(game.plane.global_position)
+		pp.x = clampf(pp.x, 3.0, size.x - 3.0)
+		pp.y = clampf(pp.y, 3.0, size.y - 3.0)
+		var pdir := (pb - pa).normalized()
+		var pside := Vector2(-pdir.y, pdir.x)
+		draw_colored_polygon(PackedVector2Array([
+			pp + pdir * 8.0,
+			pp - pdir * 5.0 + pside * 4.0,
+			pp - pdir * 5.0 - pside * 4.0,
+		]), Color(1.0, 0.92, 0.55, 1.0))
+
 	# bridge
 	if game.world.bridge_points.size() == 2:
 		draw_line(

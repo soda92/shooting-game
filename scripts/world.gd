@@ -159,6 +159,8 @@ func _process(_delta: float) -> void:
 	var p := get_tree().get_first_node_in_group("player")
 	if p == null:
 		return
+	if p.has_method("is_airborne") and p.is_airborne():
+		return
 	var c := Vector2i(
 		floori(p.global_position.x / CHUNK_SIZE),
 		floori(p.global_position.z / CHUNK_SIZE)

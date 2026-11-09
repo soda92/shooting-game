@@ -29,12 +29,13 @@ scripts/
   menu.gd              开始界面与 3D 预览
   meta.gd              模式与难度配置
   input_state.gd       全局输入层（触屏 / 键盘 / 鼠标统一）
-  player.gd            移动、跳伞、射击、换弹、槽位、瞄具、受伤
+  player.gd            移动、运输机、跳伞、射击、换弹、槽位、瞄具、受伤
   bot.gd               索敌、进圈、走位、射击、死亡
   character_visual.gd  方块小人（士兵 / 二次元 / GLB 模型）
   skins.gd             皮肤配色表与模型清单
   scopes.gd            瞄具参数表
   weapons.gd           武器参数表
+  plane.gd             运输机模型与航线
   world.gd             流式地形区块、城区、桥、房区、物资点
   grass.gd             玩家周围的分块草地（MultiMesh + 风摆 shader）
   zone.gd              缩圈与圈外伤害

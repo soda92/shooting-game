@@ -57,6 +57,19 @@ class MapCanvas extends Control:
 		if ov.game == null or ov.game.world == null:
 			return
 
+		if ov.game.plane != null and is_instance_valid(ov.game.plane):
+			var pa := m(ov.game.plane_start)
+			var pb := m(ov.game.plane_end)
+			draw_dashed_line(pa, pb, Color(1.0, 0.83, 0.30, 0.85), 3.5, 12.0)
+			var pp := m(ov.game.plane.global_position)
+			var pdir := (pb - pa).normalized()
+			var pside := Vector2(-pdir.y, pdir.x)
+			draw_colored_polygon(PackedVector2Array([
+				pp + pdir * 16.0,
+				pp - pdir * 10.0 + pside * 8.0,
+				pp - pdir * 10.0 - pside * 8.0,
+			]), Color(1.0, 0.92, 0.55, 1.0))
+
 		if ov.game.world.bridge_points.size() == 2:
 			draw_line(m(ov.game.world.bridge_points[0]), m(ov.game.world.bridge_points[1]),
 				Color(0.86, 0.80, 0.62, 0.95), 4.0)
