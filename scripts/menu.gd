@@ -14,6 +14,7 @@ var _vol_value: Label
 var _aim_toggle_btn: Button
 var _aim_hold_btn: Button
 var _gyro_check: CheckButton
+var _layout_editor
 
 
 func _ready() -> void:
@@ -238,7 +239,7 @@ func _build_settings() -> void:
 	_settings_root.add_child(dim)
 
 	var panel := PanelContainer.new()
-	_place(panel, 0.5, 0.5, 0.5, 0.5, -320, -220, 320, 220)
+	_place(panel, 0.5, 0.5, 0.5, 0.5, -320, -260, 320, 260)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.07, 0.09, 0.12, 0.98)
 	sb.border_color = Color(0.35, 0.55, 0.75, 0.85)
@@ -336,6 +337,11 @@ func _build_settings() -> void:
 	credit2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(credit2)
 
+	var layout_btn := _button("按键布局", 18)
+	layout_btn.custom_minimum_size = Vector2(560, 44)
+	layout_btn.pressed.connect(_open_layout_editor)
+	vbox.add_child(layout_btn)
+
 	var close := _button("关闭", 20)
 	close.custom_minimum_size = Vector2(560, 44)
 	close.pressed.connect(_toggle_settings)
@@ -354,6 +360,20 @@ func _build_settings() -> void:
 	_gyro_check.toggled.connect(func(on: bool) -> void:
 		InputState.set_gyro(on)
 	)
+
+
+func _open_layout_editor() -> void:
+	if _layout_editor == null:
+		_layout_editor = load("res://scripts/layout_editor.gd").new()
+		add_child(_layout_editor)
+		_layout_editor.closed.connect(_on_layout_closed)
+	_settings_root.visible = false
+	_layout_editor.open()
+
+
+func _on_layout_closed() -> void:
+	_settings_root.visible = true
+	_refresh_settings()
 
 
 func _toggle_settings() -> void:

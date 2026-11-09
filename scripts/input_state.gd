@@ -24,6 +24,8 @@ var switch_queued := false
 var grenade_queued := false
 var attach_toggle_queued := false
 var first_person := false
+var touch_layout: Dictionary = {}
+var joy_home := Vector2(-1.0, -1.0)
 
 # mirrored from the player for UI display
 var medkit_count := 0
@@ -181,15 +183,44 @@ func _load_settings() -> void:
 		gyro = bool(cf.get_value("input", "gyro", gyro))
 		aim_toggle_mode = bool(cf.get_value("input", "aim_toggle", aim_toggle_mode))
 		master_volume = float(cf.get_value("audio", "master", master_volume))
+		var layout = cf.get_value("layout", "buttons", {})
+		if layout is Dictionary:
+			for key in layout:
+				var v = layout[key]
+				if v is Vector2:
+					touch_layout[String(key)] = Vector2(
+						clampf(v.x, 0.0, 1.0), clampf(v.y, 0.0, 1.0))
+		var j = cf.get_value("layout", "joystick", null)
+		if j is Vector2:
+			joy_home = Vector2(clampf(j.x, 0.0, 1.0), clampf(j.y, 0.0, 1.0))
 
 
 func save_settings() -> void:
 	var cf := ConfigFile.new()
+	cf.load(SETTINGS_PATH)
 	cf.set_value("input", "sensitivity", sensitivity)
 	cf.set_value("input", "gyro", gyro)
 	cf.set_value("input", "aim_toggle", aim_toggle_mode)
 	cf.set_value("audio", "master", master_volume)
+	cf.set_value("layout", "buttons", touch_layout)
+	cf.set_value("layout", "joystick", joy_home)
 	cf.save(SETTINGS_PATH)
+
+
+func set_touch_layout(name: String, rel: Vector2) -> void:
+	touch_layout[name] = Vector2(clampf(rel.x, 0.0, 1.0), clampf(rel.y, 0.0, 1.0))
+	save_settings()
+
+
+func set_joy_home(rel: Vector2) -> void:
+	joy_home = Vector2(clampf(rel.x, 0.0, 1.0), clampf(rel.y, 0.0, 1.0))
+	save_settings()
+
+
+func reset_touch_layout() -> void:
+	touch_layout.clear()
+	joy_home = Vector2(-1.0, -1.0)
+	save_settings()
 
 
 func _apply_volume() -> void:

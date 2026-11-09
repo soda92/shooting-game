@@ -50,7 +50,9 @@ scripts/
   target.gd            训练场靶子
   game.gd              开局生成、存活统计、胜负判定、训练场、观战
   hud.gd               血条、弹药、槽位、播报、配件面板、镜圈
-  touch_controls.gd    虚拟摇杆、视角拖动、按钮
+  touch_controls.gd    虚拟摇杆、视角拖动、图标按钮、自定义布局
+  touch_icons.gd       局内按钮矢量图标
+  layout_editor.gd     拖拽式按键布局编辑器
   sfx.gd               音效池（2D + 3D、遮挡、回声、脚步、环境音）
 ```
 

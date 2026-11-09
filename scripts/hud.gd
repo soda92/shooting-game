@@ -191,6 +191,7 @@ var _attach_root: Control
 var _attach_title: Label
 var _attach_buttons: Dictionary = {}
 var _settings_root: Control
+var _layout_editor
 var _spec_root: Control
 var _spec_label: Label
 var _spec_btn: Button
@@ -336,7 +337,7 @@ func _build() -> void:
 	_ammo_label = _make_label("30 / 150\nM4 步枪", 30)
 	_ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_ammo_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	_place(_ammo_label, 1.0, 1.0, 1.0, 1.0, -460, -120, -200, -28)
+	_place(_ammo_label, 1.0, 0.0, 1.0, 0.0, -460, 116, -200, 220)
 
 	_slots_label = RichTextLabel.new()
 	_slots_label.bbcode_enabled = true
@@ -651,6 +652,14 @@ func _build() -> void:
 	row4.add_child(_gyro_check)
 	svbox.add_child(row4)
 
+	var slayout := Button.new()
+	slayout.text = "按键布局"
+	slayout.custom_minimum_size = Vector2(560, 44)
+	slayout.add_theme_font_size_override("font_size", 18)
+	slayout.focus_mode = Control.FOCUS_NONE
+	slayout.pressed.connect(_open_layout_editor)
+	svbox.add_child(slayout)
+
 	var sclose := Button.new()
 	sclose.text = "关闭"
 	sclose.custom_minimum_size = Vector2(560, 44)
@@ -908,12 +917,39 @@ func _toggle_settings() -> void:
 	_refresh_settings()
 	_settings_root.visible = true
 	InputState.locked = true
+	if game.touch != null:
+		game.touch.visible = false
 
 
 func _close_settings() -> void:
 	_settings_root.visible = false
 	if game != null and not game.over:
 		InputState.locked = false
+		if game.touch != null:
+			game.touch.visible = true
+
+
+func _open_layout_editor() -> void:
+	if game == null or game.player == null or game.over or not game.player.is_alive():
+		return
+	if _layout_editor == null:
+		_layout_editor = load("res://scripts/layout_editor.gd").new()
+		_layout_editor.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_layout_editor)
+		_layout_editor.closed.connect(_on_layout_closed)
+	_close_settings()
+	if game.touch != null:
+		game.touch.visible = false
+	_layout_editor.open()
+	get_tree().paused = true
+
+
+func _on_layout_closed() -> void:
+	get_tree().paused = false
+	InputState.locked = false
+	if game != null and game.touch != null:
+		game.touch.refresh_layout()
+		game.touch.visible = true
 
 
 func _refresh_settings() -> void:

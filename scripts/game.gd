@@ -96,7 +96,7 @@ func _ready() -> void:
 	hud.setup(self)
 	hud.set_center("训练场：打靶 / 无限弹药" if range_mode else "运输机进场  ·  选择落点", 2.5)
 	if not range_mode:
-		hud.flash_hint("不跳伞将在安全区边缘自动跳伞")
+		hud.flash_hint("不跳伞将在陆地边缘自动跳伞")
 
 
 func _process(delta: float) -> void:
@@ -135,17 +135,26 @@ func _make_plane_path() -> void:
 	plane_start = -dir * half + side + Vector3(0.0, 190.0, 0.0)
 	plane_end = dir * half + side + Vector3(0.0, 190.0, 0.0)
 
-	# Force ejection where the route leaves the first safe zone.
-	var flat := Vector2(plane_start.x, plane_start.z)
-	var fdir := Vector2(dir.x, dir.z)
-	var b := flat.dot(fdir)
-	var c: float = flat.length_squared() - float(zone.radius) * float(zone.radius)
-	var disc: float = b * b - c
-	if disc >= 0.0:
-		var t := -b + sqrt(disc)
-		plane_force_distance = clampf(t, 0.0, plane_start.distance_to(plane_end))
-	else:
-		plane_force_distance = plane_start.distance_to(plane_end)
+	# Force ejection near the far coastline, backed off inland so the
+	# player never has to start the match over open water.
+	var total := plane_start.distance_to(plane_end)
+	var far_land := -1.0
+	var probe := total
+	while probe >= 0.0:
+		var q := plane_start.lerp(plane_end, probe / total)
+		if world.is_land(q.x, q.z, 1.2):
+			far_land = probe
+			break
+		probe -= 4.0
+	if far_land < 0.0:
+		far_land = total
+	var force := maxf(0.0, far_land - 80.0)
+	while force > 0.0:
+		var q := plane_start.lerp(plane_end, force / total)
+		if world.is_land(q.x, q.z, 1.2):
+			break
+		force -= 10.0
+	plane_force_distance = force
 
 
 func _spawn_plane() -> void:
@@ -419,7 +428,7 @@ func drop_weapon_at(id: String, pos: Vector3) -> void:
 func _on_plane_force_jump() -> void:
 	if player != null and player.in_plane():
 		player.jump_from_plane()
-		hud.flash_hint("已到安全区边缘 · 自动跳伞")
+		hud.flash_hint("已到陆地边缘 · 自动跳伞")
 
 
 func _on_plane_finished() -> void:
